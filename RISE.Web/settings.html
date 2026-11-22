@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RISE | Settings</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..700&family=Manrope:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="pages/css/style.css">
+    <style>
+        .settings-wrap { display:grid; grid-template-columns:260px 1fr; gap:28px; max-width:1200px; }
+        .settings-nav { background:linear-gradient(135deg, rgba(14,46,31,0.88), rgba(8,28,18,0.62)); border:1px solid var(--glass-border); border-radius:18px; padding:14px; box-shadow:var(--glass-shadow); height:fit-content; position:sticky; top:90px; }
+        .settings-nav button { width:100%; text-align:left; padding:12px 14px; border:none; background:transparent; color:var(--muted-white); border-radius:12px; display:flex; align-items:center; gap:12px; cursor:pointer; transition:all 0.2s ease; margin-bottom:4px; font-weight:600; }
+        .settings-nav button:hover { background:rgba(255,255,255,0.06); color:var(--white); }
+        .settings-nav button.active { background:rgba(229,179,61,0.14); color:var(--rice-gold); border-left:3px solid var(--rice-gold); }
+        .settings-content { display:flex; flex-direction:column; gap:20px; }
+        .settings-section { display:none; }
+        .settings-section.active { display:block; }
+        .settings-card { background:linear-gradient(135deg, rgba(14,46,31,0.88), rgba(8,28,18,0.62)); border:1px solid var(--glass-border); border-radius:18px; padding:22px; box-shadow:var(--glass-shadow); }
+        .settings-card h5 { color:var(--rice-gold); font-weight:800; margin-bottom:6px; }
+        .settings-card p { color:var(--muted-white); font-size:13px; margin-bottom:12px; }
+        .account-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:16px; }
+        .account-item { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:18px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+        .account-item .btn-gold { margin-left:auto; }
+        .account-icon { width:44px; height:44px; border-radius:12px; background:rgba(229,179,61,0.15); color:var(--rice-gold); display:grid; place-items:center; font-size:20px; flex-shrink:0; }
+        .account-item h6 { margin:0 0 2px; color:var(--white); font-weight:700; }
+        .account-item small { color:var(--muted-white); font-size:12px; }
+        .btn-gold { background:var(--rice-gold); color:var(--deep-forest); font-weight:700; border:none; white-space:nowrap; padding:8px 14px; }
+        .btn-gold:hover { background:#e5bd60; color:var(--deep-forest); }
+        .notif-row { display:flex; align-items:center; justify-content:space-between; padding:14px 0; border-bottom:1px solid rgba(255,255,255,0.08); gap:16px; }
+        .notif-row:last-child { border-bottom:none; }
+        .notif-title { font-weight:700; color:var(--white); }
+        .notif-desc { font-size:12px; color:var(--muted-white); margin-top:2px; }
+        .toggle { width:46px; height:24px; border-radius:999px; background:rgba(255,255,255,0.15); position:relative; cursor:pointer; transition:background 0.2s ease; border:none; flex-shrink:0; }
+        .toggle.on { background:var(--rice-gold); }
+        .toggle::after { content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; transition:transform 0.2s ease; }
+        .toggle.on::after { transform:translateX(22px); }
+        .info-row { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.08); }
+        .info-row:last-child { border-bottom:none; }
+        .field { margin-bottom:14px; }
+        .field label { color:var(--muted-white); font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px; display:block; }
+        .field input { background:rgba(8,33,21,0.5); border:1px solid rgba(255,255,255,0.15); border-radius:10px; color:var(--white); padding:12px 14px; width:100%; max-width:420px; }
+        @media (max-width:992px){ .account-grid{grid-template-columns:1fr;} }
+        @media (max-width:768px){ .settings-wrap{grid-template-columns:1fr;} .settings-nav{position:static; display:flex; flex-wrap:wrap; gap:6px;} .settings-nav button{flex:1 1 auto; justify-content:center;} }
+    </style>
+</head>
+<body class="dashboard-background">
+    <aside class="sidebar glass-sidebar" id="sidebar">
+        <div class="brand">
+            <div class="brand-mark"><i class="bi bi-flower1"></i></div>
+            <div><strong>RISE</strong><span>Rice Farmer Assistance &amp; Analytics</span></div>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-label">Navigation</div>
+            <a class="nav-item" href="index.html"><i class="bi bi-grid-1x2"></i><span>Dashboard</span></a>
+            <a class="nav-item" href="index.html"><i class="bi bi-person-vcard"></i><span>Farmer Records</span></a>
+            <a class="nav-item" href="index.html"><i class="bi bi-box-arrow-up-right"></i><span>Assistance Distribution</span></a>
+            <a class="nav-item" href="index.html"><i class="bi bi-clipboard-data"></i><span>Utilization Monitoring</span></a>
+            <a class="nav-item" href="index.html"><i class="bi bi-file-earmark-bar-graph"></i><span>Reports &amp; Analytics</span></a>
+        </nav>
+        <div class="nav-label">Personal</div>
+        <nav class="sidebar-nav" style="padding-top:0;">
+            <a class="nav-item" href="profile.html"><i class="bi bi-person-circle"></i><span>My Profile</span></a>
+            <a class="nav-item active" href="settings.html"><i class="bi bi-gear"></i><span>Settings</span></a>
+            <button class="nav-item" type="button" id="sidebarLogoutBtn"><i class="bi bi-box-arrow-right"></i><span>Logout</span></button>
+        </nav>
+    </aside>
+    <div class="app-shell">
+        <header class="glass-header"><div class="page-heading"><h1 class="topbar-title">Settings</h1><p class="mb-0 text-muted">Manage your account, notification preferences, and security settings.</p></div></header>
+        <main class="main-content">
+            <div class="settings-wrap">
+                <div class="settings-nav">
+                    <button class="active" data-section="account"><i class="bi bi-person"></i>Account Settings</button>
+                    <button data-section="notifications"><i class="bi bi-bell"></i>Notification Settings</button>
+                    <button data-section="security"><i class="bi bi-shield-lock"></i>Security</button>
+                    <button data-section="system"><i class="bi bi-info-circle"></i>System Information</button>
+                </div>
+                <div class="settings-content">
+                    <div class="settings-section active" id="section-account">
+                        <div class="settings-card mb-3">
+                            <h5>Account Settings</h5>
+                            <p>Manage your account details and preferences.</p>
+                            <div class="account-grid">
+                                <div class="account-item">
+                                    <div class="account-icon"><i class="bi bi-envelope"></i></div>
+                                    <div class="flex-grow-1"><h6>Email Address</h6><small>Manage the email address associated with your account.</small></div>
+                                    <button class="btn btn-gold btn-sm" data-account="email">Update Email</button>
+                                </div>
+                                <div class="account-item">
+                                    <div class="account-icon"><i class="bi bi-lock"></i></div>
+                                    <div class="flex-grow-1"><h6>Password</h6><small>Change your account password to keep your account secure.</small></div>
+                                    <button class="btn btn-gold btn-sm" data-account="password">Change Password</button>
+                                </div>
+                                <div class="account-item">
+                                    <div class="account-icon"><i class="bi bi-person"></i></div>
+                                    <div class="flex-grow-1"><h6>Username</h6><small>Manage your account username.</small></div>
+                                    <button class="btn btn-gold btn-sm" data-account="username">Change Username</button>
+                                </div>
+                                <div class="account-item">
+                                    <div class="account-icon"><i class="bi bi-shield-check"></i></div>
+                                    <div class="flex-grow-1"><h6>Account Role</h6><small>View your assigned role and account permissions.</small></div>
+                                    <button class="btn btn-gold btn-sm" data-account="role">View Role</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="account-email" style="display:none;" class="settings-card mb-3">
+                            <h5>Update Email Address</h5>
+                            <form id="emailForm">
+                                <div class="field"><label>New Email</label><input type="email" id="newEmail" required></div>
+                                <button class="btn btn-gold" type="submit">Save Email</button>
+                            </form>
+                        </div>
+                        <div id="account-password" style="display:none;" class="settings-card mb-3">
+                            <h5>Change Password</h5>
+                            <form id="passwordForm">
+                                <div class="field"><label>Current Password</label><input type="password" id="currentPassword" required></div>
+                                <div class="field"><label>New Password</label><input type="password" id="newPassword" required></div>
+                                <div class="field"><label>Confirm New Password</label><input type="password" id="confirmPassword" required></div>
+                                <button class="btn btn-gold" type="submit">Change Password</button>
+                            </form>
+                        </div>
+                        <div id="account-username" style="display:none;" class="settings-card mb-3">
+                            <h5>Change Username</h5>
+                            <form id="usernameForm">
+                                <div class="field"><label>New Username</label><input type="text" id="newUsername" required></div>
+                                <button class="btn btn-gold" type="submit">Save Username</button>
+                            </form>
+                        </div>
+                        <div id="account-role" style="display:none;" class="settings-card mb-3">
+                            <h5>Account Role</h5>
+                            <div class="info-row"><span>Role</span><strong id="roleDisplay"></strong></div>
+                        </div>
+                    </div>
+                    <div class="settings-section" id="section-notifications">
+                        <div class="settings-card">
+                            <h5>Notification Settings</h5>
+                            <p>Manage your notification preferences.</p>
+                            <div class="notif-row"><div><div class="notif-title">System Announcements</div><div class="notif-desc">Receive important system announcements.</div></div><button class="toggle" id="t1"></button></div>
+                            <div class="notif-row"><div><div class="notif-title">Farmer Record Updates</div><div class="notif-desc">Receive notifications when farmer records are updated.</div></div><button class="toggle" id="t2"></button></div>
+                            <div class="notif-row"><div><div class="notif-title">New Farmer Registration</div><div class="notif-desc">Receive notifications about newly registered farmers.</div></div><button class="toggle" id="t3"></button></div>
+                            <div class="notif-row"><div><div class="notif-title">Report Generation Updates</div><div class="notif-desc">Receive updates about report generation and processing.</div></div><button class="toggle" id="t4"></button></div>
+                            <div class="notif-row"><div><div class="notif-title">Important System Alerts</div><div class="notif-desc">Receive important system alerts and announcements.</div></div><button class="toggle" id="t5"></button></div>
+                            <button class="btn btn-gold mt-3" id="saveNotifBtn" type="button">Save Preferences</button>
+                        </div>
+                    </div>
+                    <div class="settings-section" id="section-security">
+                        <div class="settings-card">
+                            <h5>Security</h5>
+                            <div class="info-row"><span>Last Login</span><strong id="lastLogin"></strong></div>
+                            <p class="text-muted small mt-3">Login activity is not available in the current backend.</p>
+                            <hr>
+                            <h6 class="text-danger">Delete Account</h6>
+                            <p class="text-muted small">Permanently delete your administrator account. This cannot be undone.</p>
+                            <button class="btn btn-danger" id="deleteAccountBtn" type="button">Delete Account</button>
+                        </div>
+                    </div>
+                    <!-- Delete Account Modal -->
+                    <div class="modal fade" id="deleteAccountModal" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header"><h5 class="modal-title">Delete Administrator Account</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                                <div class="modal-body">
+                                    <p>Are you sure you want to permanently delete your administrator account? This action will remove your administrator access to RISE.</p>
+                                    <div class="field"><label>Current Password</label><input type="password" id="deletePassword" required></div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancel</button>
+                                    <button class="btn btn-danger" id="confirmDeleteAccountBtn" type="button">Delete</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-section" id="section-system">
+                        <div class="settings-card">
+                            <h5>System Information</h5>
+                            <div class="info-row"><span>Application Name</span><span>RISE</span></div>
+                            <div class="info-row"><span>Description</span><span>Rice Farmer Assistance &amp; Analytics</span></div>
+                            <div class="info-row"><span>Version</span><span>1.0.0</span></div>
+                            <div class="info-row"><span>Account Role</span><strong id="roleDisplay2"></strong></div>
+                            <div class="info-row"><span>Account Status</span><span>Active</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <!-- Logout Modal -->
+    <div class="modal fade" id="logoutModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="background:linear-gradient(135deg, rgba(14,46,31,0.95), rgba(8,28,18,0.98)); border:1px solid var(--rice-gold); border-radius:18px; box-shadow:0 24px 64px rgba(0,0,0,0.6);">
+                <div class="modal-body text-center p-4">
+                    <div style="width:64px;height:64px;border-radius:50%;background:rgba(229,179,61,0.15);border:2px solid var(--rice-gold);display:grid;place-items:center;margin:0 auto 16px;font-size:28px;color:var(--rice-gold);"><i class="bi bi-box-arrow-right"></i></div>
+                    <h5 style="color:var(--white);font-weight:800;">Confirm Logout</h5>
+                    <p style="color:var(--muted-white);margin:8px 0 4px;">Are you sure you want to log out of your RISE account?</p>
+                    <p style="color:var(--text-dim);font-size:12px;">You will need to sign in again to access your account.</p>
+                    <div class="d-flex gap-2 justify-content-center mt-3">
+                        <button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancel</button>
+                        <button class="btn btn-success" id="confirmLogoutBtn" type="button">Yes, Log Out</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="pages/css/js/auth.js"></script>
+    <script>
+        if (!window.RISEAuth.isAuthenticated()) { window.location.href='login.html'; }
+        // settings internal nav
+        document.querySelectorAll('.settings-nav button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.settings-nav button').forEach(b=>b.classList.remove('active'));
+                btn.classList.add('active');
+                const sec = btn.dataset.section;
+                document.querySelectorAll('.settings-section').forEach(s=>s.classList.remove('active'));
+                document.getElementById('section-'+sec).classList.add('active');
+            });
+        });
+        // account sub-sections
+        document.querySelectorAll('[data-account]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                ['email','password','username','role'].forEach(k => {
+                    const el = document.getElementById('account-'+k);
+                    if (el) el.style.display = 'none';
+                });
+                const key = btn.dataset.account;
+                const el = document.getElementById('account-'+key);
+                if (el) el.style.display = 'block';
+            });
+        });
+        async function loadSettings() {
+            const res = await fetch('http://localhost:5000/api/auth/me', { headers: { 'Authorization': 'Bearer ' + window.RISEAuth.getToken() } });
+            const user = await res.json();
+            document.getElementById('roleDisplay').textContent = user.role || 'Not available';
+            document.getElementById('roleDisplay2').textContent = user.role || 'Not available';
+            document.getElementById('lastLogin').textContent = user.lastLoginAtUtc ? new Date(user.lastLoginAtUtc).toLocaleString('en-US', { timeZone: 'Asia/Manila', year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit', hour12:true }) : 'Not available';
+            document.getElementById('newEmail').value = user.email || '';
+            document.getElementById('newUsername').value = user.userName || '';
+            const map = { t1:'notifySystemAnnouncements', t2:'notifyFarmerRecordUpdates', t3:'notifyNewFarmerRegistration', t4:'notifyReportGenerationUpdates', t5:'notifyImportantSystemAlerts' };
+            Object.keys(map).forEach(id => {
+                const el = document.getElementById(id);
+                const key = map[id];
+                if (user[key]) el.classList.add('on'); else el.classList.remove('on');
+                el.addEventListener('click', () => el.classList.toggle('on'));
+            });
+        }
+        document.getElementById('emailForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('newEmail').value.trim();
+            const res = await fetch('http://localhost:5000/api/auth/update-email', { method:'PUT', headers: { 'Content-Type':'application/json', 'Authorization': 'Bearer ' + window.RISEAuth.getToken() }, body: JSON.stringify({ Email: email }) });
+            alert(res.ok ? 'Email updated' : 'Failed');
+        });
+        document.getElementById('passwordForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const body = { CurrentPassword: document.getElementById('currentPassword').value, NewPassword: document.getElementById('newPassword').value, ConfirmNewPassword: document.getElementById('confirmPassword').value };
+            const res = await fetch('http://localhost:5000/api/auth/change-password', { method:'PUT', headers: { 'Content-Type':'application/json', 'Authorization': 'Bearer ' + window.RISEAuth.getToken() }, body: JSON.stringify(body) });
+            alert(res.ok ? 'Password changed' : 'Failed');
+        });
+        document.getElementById('usernameForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('newUsername').value.trim();
+            const res = await fetch('http://localhost:5000/api/auth/change-username', { method:'PUT', headers: { 'Content-Type':'application/json', 'Authorization': 'Bearer ' + window.RISEAuth.getToken() }, body: JSON.stringify({ Username: username }) });
+            alert(res.ok ? 'Username updated' : 'Failed');
+        });
+        document.getElementById('saveNotifBtn').addEventListener('click', async () => {
+            const body = {
+                NotifySystemAnnouncements: document.getElementById('t1').classList.contains('on'),
+                NotifyFarmerRecordUpdates: document.getElementById('t2').classList.contains('on'),
+                NotifyNewFarmerRegistration: document.getElementById('t3').classList.contains('on'),
+                NotifyReportGenerationUpdates: document.getElementById('t4').classList.contains('on'),
+                NotifyImportantSystemAlerts: document.getElementById('t5').classList.contains('on')
+            };
+            const res = await fetch('http://localhost:5000/api/auth/notifications', { method:'PUT', headers: { 'Content-Type':'application/json', 'Authorization': 'Bearer ' + window.RISEAuth.getToken() }, body: JSON.stringify(body) });
+            alert(res.ok ? 'Preferences saved' : 'Failed');
+        });
+        const deleteModal = new bootstrap.Modal(document.getElementById('deleteAccountModal'));
+        document.getElementById('deleteAccountBtn').addEventListener('click', () => deleteModal.show());
+        document.getElementById('confirmDeleteAccountBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('confirmDeleteAccountBtn');
+            btn.disabled = true; btn.textContent = 'Deleting...';
+            const pwd = document.getElementById('deletePassword').value;
+            const res = await fetch('http://localhost:5000/api/auth/account', { method:'DELETE', headers: { 'Content-Type':'application/json', 'Authorization': 'Bearer ' + window.RISEAuth.getToken() }, body: JSON.stringify({ CurrentPassword: pwd }) });
+            btn.disabled = false; btn.textContent = 'Delete';
+            if (res.ok) {
+                await window.RISEAuth.logout();
+                alert('Your administrator account has been successfully deleted.');
+                window.location.href = 'login.html';
+            } else {
+                const t = await res.text(); alert(t || 'Delete failed');
+            }
+        });
+        const logoutModal = new bootstrap.Modal(document.getElementById('logoutModal'));
+        document.getElementById('sidebarLogoutBtn').addEventListener('click', () => logoutModal.show());
+        document.getElementById('confirmLogoutBtn').addEventListener('click', async () => {
+            document.getElementById('confirmLogoutBtn').disabled = true;
+            await window.RISEAuth.logout();
+            window.location.href='login.html';
+        });
+        loadSettings();
+    </script>
+</body>
+</html>

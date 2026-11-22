@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="RISE Rice Farmer Management and Agricultural Data Analytics System">
+    <title>RISE | Rice Farmer Management</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..700&family=Manrope:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="pages/css/style.css">
+</head>
+<body class="dashboard-background">
+    <div id="authRedirect" style="display:none;">
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:var(--deep-forest);color:white;text-align:center;padding:20px;">
+            <div class="spinner-border text-gold" style="width:3rem;height:3rem;margin-bottom:1rem;"></div>
+            <p>Checking session…</p>
+        </div>
+    </div>
+    <aside class="sidebar glass-sidebar" id="sidebar">
+        <div class="brand">
+            <div class="brand-mark" aria-hidden="true">
+                <i class="bi bi-flower1"></i>
+            </div>
+            <div>
+                <strong>RISE</strong>
+                <span>Rice Farmer Assistance &amp; Analytics</span>
+            </div>
+            <button class="sidebar-collapse-btn d-none d-lg-grid" id="sidebarCollapseBtn" type="button" title="Hide sidebar navigation" aria-label="Hide sidebar">
+                <i class="bi bi-chevron-left"></i>
+            </button>
+            <button class="sidebar-close d-lg-none" id="sidebarClose" type="button" aria-label="Close navigation">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <nav class="sidebar-nav" aria-label="Primary navigation">
+            <div class="nav-label">Navigation</div>
+            <button class="nav-item active" type="button" data-view="dashboard"><i class="bi bi-grid-1x2"></i><span>Dashboard</span></button>
+            <button class="nav-item" type="button" data-view="farmers"><i class="bi bi-person-vcard"></i><span>Farmer Records</span></button>
+            <button class="nav-item" type="button" data-view="distribution"><i class="bi bi-box-arrow-up-right"></i><span>Assistance Distribution</span></button>
+            <button class="nav-item" type="button" data-view="supplies"><i class="bi bi-box-seam"></i><span>Supply Management</span></button>
+            <button class="nav-item" type="button" data-view="utilization"><i class="bi bi-clipboard-data"></i><span>Utilization Monitoring</span></button>
+            <button class="nav-item" type="button" data-view="reports"><i class="bi bi-file-earmark-bar-graph"></i><span>Reports &amp; Analytics</span></button>
+        </nav>
+        <div class="nav-label">Personal</div>
+        <nav class="sidebar-nav" aria-label="Personal navigation" style="padding-top:0;">
+            <a class="nav-item" href="profile.html"><i class="bi bi-person-circle"></i><span>My Profile</span></a>
+            <a class="nav-item" href="settings.html"><i class="bi bi-gear"></i><span>Settings</span></a>
+            <button class="nav-item" type="button" id="sidebarLogoutBtn"><i class="bi bi-box-arrow-right"></i><span>Logout</span></button>
+        </nav>
+
+
+    </aside>
+
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+    <div class="app-shell">
+        <header class="topbar glass-header" id="topbar">
+            <button class="icon-button sidebar-toggle-btn mobile-menu" id="mobileMenu" type="button" aria-label="Toggle navigation" title="Toggle sidebar">
+                <i class="bi bi-layout-sidebar-inset"></i>
+            </button>
+            <div class="page-heading">
+                <nav aria-label="Breadcrumb" class="topbar-breadcrumb">
+                    <ol class="breadcrumb mb-1">
+                        <li class="breadcrumb-item"><i class="bi bi-flower1 me-1 text-gold"></i>RISE</li>
+                        <li class="breadcrumb-item active" id="breadcrumbCurrent">Dashboard</li>
+                    </ol>
+                </nav>
+                <div class="topbar-title-row">
+                    <h1 id="pageTitle" class="topbar-title">Dashboard</h1>
+
+                </div>
+            </div>
+            <div class="topbar-actions">
+                <div class="global-search glass-input d-none d-lg-flex" title="Search records (press Enter to view in Farmers)">
+                    <i class="bi bi-search search-icon"></i>
+                    <input id="globalSearch" type="search" placeholder="Search records..." autocomplete="off">
+                    <span class="search-badge"><kbd>↵</kbd></span>
+                </div>
+                <time class="header-date d-none" id="headerDate"></time>
+                <div class="header-clock-pill d-none d-xl-flex" title="Local System Time">
+                    <span class="live-pulse-dot" aria-hidden="true"></span>
+                    <i class="bi bi-clock me-1 text-gold"></i>
+                    <time class="header-clock" id="headerClock"></time>
+                </div>
+                <button class="icon-button" id="notificationButton" type="button" aria-label="Open recent system activity" title="Recent system activity">
+                    <i class="bi bi-bell"></i>
+                </button>
+                <button class="btn btn-success header-add-button" id="addRecordButton" type="button">
+                    <i class="bi bi-plus-lg me-1"></i><span class="d-none d-md-inline">Add new record</span><span class="d-md-none">Add</span>
+                </button>
+                <div class="topbar-profile" id="topbarProfile">
+                    <div class="profile-avatar" aria-hidden="true">
+                        <i class="bi bi-person-badge"></i>
+                        <span class="avatar-status-dot" title="Active"></span>
+                    </div>
+                    <div class="d-none d-md-block profile-meta">
+                        <strong class="profile-title" id="profileTitle">Officer Console</strong>
+                        <span class="profile-subtitle"><i class="bi bi-shield-check me-1"></i><span id="profileRole">DA Officer</span></span>
+                    </div>
+
+                </div>
+            </div>
+        </header>
+
+        <main class="main-content" id="mainContent"></main>
+    </div>
+
+    <div class="rice-accent" aria-hidden="true"></div>
+
+    <div class="modal fade" id="farmerModal" tabindex="-1" aria-labelledby="farmerModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <form id="farmerForm">
+                    <div class="modal-header">
+                        <div>
+                            <p class="eyebrow mb-1">FARMER RECORD</p>
+                            <h2 class="modal-title fs-5" id="farmerModalTitle">Register farmer</h2>
+                        </div>
+                        <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input id="farmerId" type="hidden">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label" for="lastName">Last name <span class="text-danger">*</span></label>
+                                <input class="form-control" id="lastName" name="LastName" required maxlength="60">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label" for="firstName">First name</label>
+                                <input class="form-control" id="firstName" name="FirstName" maxlength="60">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label" for="middleName">Middle name</label>
+                                <input class="form-control" id="middleName" name="MiddleName" maxlength="60">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label" for="contactNumber">Contact number <span class="text-danger">*</span></label>
+                                <input class="form-control" id="contactNumber" name="ContactNumber" type="tel" required minlength="7" maxlength="30">
+                            </div>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label" for="barangay">Barangay</label>
+                                <input class="form-control" id="barangay" name="Barangay" maxlength="100">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="municipality">Municipality</label>
+                                <input class="form-control" id="municipality" name="Municipality" maxlength="100">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="province">Province</label>
+                                <input class="form-control" id="province" name="Province" maxlength="100">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-light" type="button" data-bs-dismiss="modal">Cancel</button>
+                        <button class="btn btn-success" id="saveFarmerButton" type="submit">Save farmer</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="profileModal" tabindex="-1" aria-labelledby="profileName" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <p class="eyebrow mb-1">FARMER PROFILE</p>
+                        <h2 class="modal-title fs-5" id="profileName"></h2>
+                    </div>
+                    <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <dl class="modal-body row mb-0">
+                    <dt class="col-5">Contact number</dt><dd class="col-7" id="profileContact"></dd>
+                    <dt class="col-5">Barangay</dt><dd class="col-7" id="profileBarangay"></dd>
+                    <dt class="col-5">Municipality</dt><dd class="col-7" id="profileMunicipality"></dd>
+                    <dt class="col-5">Province</dt><dd class="col-7" id="profileProvince"></dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="supplySummaryModal" tabindex="-1" aria-labelledby="supplySummaryTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <p class="eyebrow mb-1">SUPPLY SUMMARY</p>
+                        <h2 class="modal-title fs-5" id="supplySummaryTitle"></h2>
+                    </div>
+                    <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <dl class="modal-body row mb-0">
+                    <dt class="col-5">Category</dt><dd class="col-7" id="supplySummaryCategory"></dd>
+                    <dt class="col-5">Unit</dt><dd class="col-7" id="supplySummaryUnit"></dd>
+                    <dt class="col-5">Stock</dt><dd class="col-7" id="supplySummaryStock"></dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="distributionSummaryModal" tabindex="-1" aria-labelledby="distributionSummaryTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <p class="eyebrow mb-1">DISTRIBUTION SUMMARY</p>
+                        <h2 class="modal-title fs-5" id="distributionSummaryTitle"></h2>
+                    </div>
+                    <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <dl class="modal-body row mb-0">
+                    <dt class="col-5">Barangay / Municipality</dt><dd class="col-7" id="distSummaryLoc"></dd>
+                    <dt class="col-5">Date</dt><dd class="col-7" id="distSummaryDate"></dd>
+                    <dt class="col-5">Status</dt><dd class="col-7" id="distSummaryStatus"></dd>
+                    <dt class="col-5">Notes</dt><dd class="col-7" id="distSummaryNotes"></dd>
+                </dl>
+                <div class="modal-body">
+                    <h6 class="mt-3 mb-2">Items</h6>
+                    <table class="table table-sm" id="distSummaryItems"></table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastContainer"></div>
+    <!-- Logout Modal -->
+    <div class="modal fade" id="logoutModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="background:linear-gradient(135deg, rgba(14,46,31,0.95), rgba(8,28,18,0.98)); border:1px solid var(--rice-gold); border-radius:18px; box-shadow:0 24px 64px rgba(0,0,0,0.6);">
+                <div class="modal-body text-center p-4">
+                    <div style="width:64px;height:64px;border-radius:50%;background:rgba(229,179,61,0.15);border:2px solid var(--rice-gold);display:grid;place-items:center;margin:0 auto 16px;font-size:28px;color:var(--rice-gold);"><i class="bi bi-box-arrow-right"></i></div>
+                    <h5 style="color:var(--white);font-weight:800;">Confirm Logout</h5>
+                    <p style="color:var(--muted-white);margin:8px 0 4px;">Are you sure you want to log out of your RISE account?</p>
+                    <p style="color:var(--text-dim);font-size:12px;">You will need to sign in again to access your account.</p>
+                    <div class="d-flex gap-2 justify-content-center mt-3">
+                        <button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancel</button>
+                        <button class="btn btn-success" id="confirmLogoutBtn" type="button">Yes, Log Out</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="pages/css/js/auth.js"></script>
+    <script src="pages/css/js/ui-theme.js"></script>
+    <script src="pages/css/js/api.js"></script>
+    <script>
+        (function () {
+            const redirectEl = document.getElementById("authRedirect");
+            const logoutBtn = document.getElementById("logoutBtn");
+            const profileTitle = document.getElementById("profileTitle");
+            const profileRole = document.getElementById("profileRole");
+
+            // Check authentication on page load
+            if (!window.RISEAuth.isAuthenticated()) {
+                window.location.href = "login.html";
+                return;
+            }
+
+            redirectEl.style.display = "none";
+
+            // Update profile display
+            const user = window.RISEAuth.getUser();
+            if (user) {
+                if (profileTitle) profileTitle.textContent = user.displayName || "Officer Console";
+                if (profileRole) profileRole.textContent = user.role || "DA Officer";
+            }
+
+            // Listen for auth changes
+            window.RISEAuth.onAuthChange((user) => {
+                if (!user) {
+                    window.location.href = "login.html";
+                    return;
+                }
+                if (profileTitle) profileTitle.textContent = user.displayName || "Officer Console";
+                if (profileRole) profileRole.textContent = user.role || "DA Officer";
+            });
+
+            // Sidebar logout handler
+            const sidebarLogoutBtn = document.getElementById("sidebarLogoutBtn");
+            const logoutModal = new bootstrap.Modal(document.getElementById("logoutModal"));
+            if (sidebarLogoutBtn) {
+                sidebarLogoutBtn.addEventListener("click", () => logoutModal.show());
+            }
+            const confirmLogoutBtn = document.getElementById("confirmLogoutBtn");
+            if (confirmLogoutBtn) {
+                confirmLogoutBtn.addEventListener("click", async () => {
+                    confirmLogoutBtn.disabled = true;
+                    await window.RISEAuth.logout();
+                    window.location.href = "login.html";
+                });
+            }
+        })();
+    </script>
+</body>
+</html>

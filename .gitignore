@@ -1,0 +1,28 @@
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# .NET build files
+**/bin/
+**/obj/
+**/publish/
+
+# Electron dependencies
+RISE.Desktop/node_modules/
+
+# Electron build outputs
+RISE.Desktop/dist/
+RISE.Desktop/dist2/
+RISE.Desktop/out/
+RISE.Desktop/win-unpacked/
+
+# Installer and large dependencies
+# Keep local copies, but do not commit installers
+*.msi
+
+# Temporary files
+*.log
+*.tmp
+.DS_Store

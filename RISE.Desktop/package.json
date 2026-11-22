@@ -1,0 +1,63 @@
+
+{
+  "name": "rise-desktop",
+  "version": "1.0.0",
+  "description": "RISE - Rice Information, Supply, and Evaluation System",
+  "main": "main.js",
+  "author": "RISE Development Team",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "45.4.1",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "com.rise.farmermanagement",
+    "productName": "RISE Desktop",
+    "directories": {
+      "output": "dist"
+    },
+    "compression": "store",
+    "asar": false,
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../RISE.Web",
+        "to": "RISE.Web"
+      },
+      {
+        "from": "../RISE.API/bin/Release/net11.0/win-x64/publish",
+        "to": "RISE.API"
+      },
+      {
+        "from": "resources/SqlLocalDB.msi",
+        "to": "SqlLocalDB.msi"
+      }
+    ],
+    "electronDist": "node_modules/electron/dist",
+    "win": {
+      "requestedExecutionLevel": "requireAdministrator",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "RISE Desktop",
+      "include": "build/installer.nsh"
+    }
+  }
+}

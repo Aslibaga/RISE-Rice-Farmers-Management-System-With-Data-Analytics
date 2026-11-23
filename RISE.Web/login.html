@@ -342,6 +342,36 @@
             color: #e5bd60;
             text-decoration: underline;
         }
+        .auth-divider { margin: 22px 0 16px; }
+        .auth-signup-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            width: 100%;
+            min-height: 44px;
+            border: 1px solid rgba(229, 179, 61, 0.5);
+            border-radius: 11px;
+            color: var(--rice-gold-bright);
+            background: rgba(229, 179, 61, 0.08);
+            font-size: 13.5px;
+            font-weight: 800;
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+        .auth-signup-btn:hover {
+            color: #051a10;
+            background: var(--rice-gold);
+            border-color: var(--rice-gold-bright);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(229, 179, 61, 0.3);
+        }
+        .auth-signup-note {
+            text-align: center;
+            margin: 10px 0 0;
+            font-size: 11.5px;
+            color: var(--muted-white);
+        }
         .auth-error {
             background: rgba(117, 36, 32, 0.75);
             border: 1px solid rgba(217, 104, 92, 0.5);
@@ -449,6 +479,9 @@
                         <a href="reset-password.html" class="auth-forgot">Forgot password?</a>
                     </div>
                     <button type="submit" class="auth-btn" id="loginBtn">Sign In</button>
+                    <div class="auth-divider">New to RISE?</div>
+                    <a href="signup.html" class="auth-signup-btn"><i class="bi bi-person-plus"></i> Create an account</a>
+                    <p class="auth-signup-note">Register with your DA office details to get started.</p>
                 </form>
 
             </div>

@@ -2,8 +2,26 @@ const { app, BrowserWindow, shell } = require("electron");
 const path = require("path");
 const { spawn } = require("child_process");
 const http = require("http");
+const fs = require("fs");
 
 let apiProcess = null;
+
+// Connection string is read from server-config.json in the app data folder so every
+// installed copy can be pointed at the same shared SQL Server without rebuilding.
+function getConnectionString() {
+    if (process.env.RISE_DB_CONNECTION) return process.env.RISE_DB_CONNECTION;
+    const configPath = path.join(app.getPath("userData"), "server-config.json");
+    try {
+        const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+        if (config.connectionString) return config.connectionString;
+    } catch {}
+    const fallback = "Server=(localdb)\\MSSQLLocalDB;Database=RISE_DB;Trusted_Connection=True;TrustServerCertificate=True;";
+    try {
+        fs.mkdirSync(path.dirname(configPath), { recursive: true });
+        fs.writeFileSync(configPath, JSON.stringify({ connectionString: fallback }, null, 2));
+    } catch {}
+    return fallback;
+}
 
 function getApiPath() {
     return app.isPackaged
@@ -14,7 +32,7 @@ function getApiPath() {
 function startApi() {
     const apiPath = getApiPath();
     const env = Object.assign({}, process.env, {
-        RISE_DB_CONNECTION: "Server=(localdb)\\MSSQLLocalDB;Database=RISE_DB;Trusted_Connection=True;TrustServerCertificate=True;",
+        RISE_DB_CONNECTION: getConnectionString(),
         ASPNETCORE_URLS: "http://localhost:5000"
     });
     apiProcess = spawn(apiPath, [], { env, detached: false, stdio: "ignore" });

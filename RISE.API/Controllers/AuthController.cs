@@ -47,12 +47,10 @@ public class AuthController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        // Enforce single administrator account
+        // First account becomes Administrator; every subsequent account becomes a DA Officer.
+        // This allows many users to register while keeping a single full-access administrator.
         var adminExists = await _context.UserRoles.AnyAsync(ur => ur.Role != null && ur.Role.Name == "Administrator", cancellationToken);
-        if (adminExists)
-        {
-            return Conflict("An administrator account already exists. Registration is disabled.");
-        }
+        var assignedRoleName = adminExists ? "DA Officer" : "Administrator";
 
         if (!request.Password.Equals(request.ConfirmPassword, StringComparison.Ordinal))
         {
@@ -77,16 +75,16 @@ public class AuthController : ControllerBase
             return Conflict("An account with this username already exists.");
         }
 
-        // Get Administrator role
-        var adminRole = await _context.Roles
-            .FirstOrDefaultAsync(r => r.Name == "Administrator", cancellationToken);
+        // Resolve the role to assign to the new account
+        var assignedRole = await _context.Roles
+            .FirstOrDefaultAsync(r => r.Name == assignedRoleName, cancellationToken);
 
-        if (adminRole is null)
+        if (assignedRole is null)
         {
             return Problem(
                 statusCode: StatusCodes.Status500InternalServerError,
                 title: "System configuration error.",
-                detail: "Administrator role not found.");
+                detail: $"{assignedRoleName} role not found.");
         }
 
         var user = new User
@@ -113,11 +111,11 @@ public class AuthController : ControllerBase
                 title: "The account could not be created.");
         }
 
-        // Assign Administrator role
+        // Assign the resolved role
         _context.UserRoles.Add(new UserRole
         {
             UserId = user.UserId,
-            RoleId = adminRole.RoleId,
+            RoleId = assignedRole.RoleId,
             AssignedAtUtc = DateTime.UtcNow
         });
 
@@ -143,7 +141,7 @@ public class AuthController : ControllerBase
                 user.UserName,
                 user.Email,
                 user.DisplayName,
-                "Administrator",
+                assignedRoleName,
                 user.IsActive,
                 user.CreatedAtUtc)
         });

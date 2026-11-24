@@ -20,7 +20,9 @@ public sealed record UtilizationDto(
     decimal? QuantityDisposed,
     decimal UnreportedQuantity,
     DateOnly MonitoringDate,
-    string? Remarks);
+    string? Remarks,
+    string? CategoryName,
+    DateOnly? TargetMonitoringDate);
 
 public sealed class UtilizationWriteDto
 {

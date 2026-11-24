@@ -89,6 +89,7 @@ public class DistributionItem
     public decimal Quantity { get; set; }
     public decimal UnitCost { get; set; }
     public string? LotNumber { get; set; }
+    public DateOnly? TargetMonitoringDate { get; set; }
     public Distribution Distribution { get; set; } = null!;
     public Supply Supply { get; set; } = null!;
     public ICollection<PlantingRecord> PlantingRecords { get; set; } = new List<PlantingRecord>();

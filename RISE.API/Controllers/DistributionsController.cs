@@ -88,7 +88,7 @@ public sealed class DistributionsController : ControllerBase
                         item.Supply.UnitOfMeasure,
                         item.Quantity,
                         item.UnitCost,
-                        item.LotNumber))
+                        item.LotNumber, item.TargetMonitoringDate))
                     .ToList()))
             .ToListAsync(cancellationToken);
         return Ok(distributions);
@@ -122,7 +122,7 @@ public sealed class DistributionsController : ControllerBase
                         item.Supply.UnitOfMeasure,
                         item.Quantity,
                         item.UnitCost,
-                        item.LotNumber))
+                        item.LotNumber, item.TargetMonitoringDate))
                     .ToList()))
             .FirstOrDefaultAsync(cancellationToken);
         return result is null ? NotFound() : Ok(result);
@@ -334,7 +334,8 @@ public sealed class DistributionsController : ControllerBase
                 SupplyId = item.SupplyId,
                 Quantity = item.Quantity,
                 UnitCost = item.UnitCost,
-                LotNumber = Clean(item.LotNumber)
+                LotNumber = Clean(item.LotNumber),
+                TargetMonitoringDate = item.TargetMonitoringDate
             }).ToList()
         };
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
@@ -423,7 +424,8 @@ public sealed class DistributionsController : ControllerBase
             SupplyId = item.SupplyId,
             Quantity = item.Quantity,
             UnitCost = item.UnitCost,
-            LotNumber = Clean(item.LotNumber)
+            LotNumber = Clean(item.LotNumber),
+            TargetMonitoringDate = item.TargetMonitoringDate
         }).ToList();
         try
         {

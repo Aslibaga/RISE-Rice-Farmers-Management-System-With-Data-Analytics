@@ -16,7 +16,7 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261122080322_AddFarmerProvince";
+    public override string LastMigrationId => "20261124144220_AddTargetMonitoringDate";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -250,6 +250,9 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
 
                 b.Property<int>("SupplyId")
                     .HasColumnType("int");
+
+                b.Property<DateOnly?>("TargetMonitoringDate")
+                    .HasColumnType("date");
 
                 b.Property<decimal>("UnitCost")
                     .HasPrecision(18, 2)

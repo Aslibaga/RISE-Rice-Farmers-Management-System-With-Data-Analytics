@@ -487,6 +487,12 @@ async function openDistributionModal(mode, id) {
     const readOnly = mode === "view";
     const defaultDate = new Date().toISOString().slice(0, 10);
     const supplyCategory = supplyId => supplies.find(s => Number(s.supplyId) === Number(supplyId))?.categoryName || "";
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const monthOptions = monthNames.map((name, index) => `<option value="${String(index + 1).padStart(2, "0")}">${name}</option>`).join("");
+    const targetBase = new Date(`${record?.distributionDate || defaultDate}T00:00:00`);
+    targetBase.setMonth(targetBase.getMonth() + (utilTargetMonths || 3));
+    const defaultTargetMonth = String(targetBase.getMonth() + 1).padStart(2, "0");
+    const defaultTargetYear = targetBase.getFullYear();
     const supplySelect = selectedId => `<option value="">Select assistance item...</option>${supplies.map(supply => `<option value="${supply.supplyId}" data-unit="${escapeHtml(supply.unitOfMeasure)}" data-category="${escapeHtml(supply.categoryName)}" data-stock="${supply.stockQuantity}"${Number(selectedId) === Number(supply.supplyId) ? " selected" : ""}>${escapeHtml(`${supply.name} (${supply.unitOfMeasure})`)}</option>`).join("")}`;
 
     document.getElementById("recordModalHost")?.remove();
@@ -503,23 +509,26 @@ async function openDistributionModal(mode, id) {
                 <dt class="col-5">Notes</dt><dd class="col-7">${escapeHtml(record?.notes || "—")}</dd>
             </dl>
             <h3 class="h6 mt-4 mb-2">Assistance items</h3>
-            <div class="table-responsive"><table class="table"><thead><tr><th>Assistance item</th><th>Category</th><th>Quantity</th><th>Unit</th></tr></thead><tbody>
-                ${(record?.items || []).map(item => `<tr><td>${escapeHtml(item.supplyName || supplies.find(s => s.supplyId === item.supplyId)?.name || "—")}</td><td>${escapeHtml(supplyCategory(item.supplyId) || "—")}</td><td>${escapeHtml(item.quantity ?? 0)}</td><td>${escapeHtml(item.unitOfMeasure || "—")}</td></tr>`).join("")}
+            <div class="table-responsive"><table class="table distribution-items-table"><colgroup><col class="col-di-item"><col class="col-di-category"><col class="col-di-qty"><col class="col-di-unit"><col class="col-di-target"></colgroup><thead><tr><th>Assistance item</th><th>Category</th><th>Quantity</th><th>Unit</th><th>Target month/year</th></tr></thead><tbody>
+                ${(record?.items || []).map(item => `<tr><td>${escapeHtml(item.supplyName || supplies.find(s => s.supplyId === item.supplyId)?.name || "—")}</td><td>${escapeHtml(supplyCategory(item.supplyId) || "—")}</td><td>${escapeHtml(item.quantity ?? 0)}</td><td>${escapeHtml(item.unitOfMeasure || "—")}</td><td>${escapeHtml(item.targetMonitoringDate || "—")}</td></tr>`).join("")}
             </tbody></table></div>
         </div>` : `
         <div class="modal-body"><div class="row g-3">
             <div class="col-md-6"><label class="form-label">Farmer</label>
                 <div class="farmer-autocomplete" id="farmerAutocomplete">
-                    <input class="form-control" id="farmerSearchInput" type="text" placeholder="Search farmer by name or ID..." autocomplete="off" value="${escapeHtml(selectedFarmer?.fullName || "")}">
+                    <div class="farmer-search-input-wrap">
+                        <input class="form-control" id="farmerSearchInput" type="text" placeholder="Search farmer by name or ID..." autocomplete="off" value="${escapeHtml(selectedFarmer?.fullName || "")}">
+                        <button class="farmer-search-clear" type="button" id="farmerSearchClear" title="Clear selected farmer" ${selectedFarmer ? "" : "hidden"}><i class="bi bi-x"></i></button>
+                        <i class="bi bi-check-circle-fill farmer-search-check" id="farmerSearchCheck"${selectedFarmer ? "" : " hidden"}></i>
+                    </div>
                     <input type="hidden" name="farmerId" id="farmerSearchValue" value="${selectedFarmer?.farmerId || ""}">
-                    <button class="farmer-search-clear" type="button" id="farmerSearchClear" title="Clear selected farmer" ${selectedFarmer ? "" : "hidden"}><i class="bi bi-x"></i></button>
                     <div class="farmer-search-menu" id="farmerSearchMenu" hidden></div>
                     <div class="farmer-search-feedback small" id="farmerSearchFeedback"></div>
                 </div>
             </div>
             <div class="col-md-6"><label class="form-label">Distribution date</label><input class="form-control" name="distributionDate" type="date" value="${escapeHtml(record?.distributionDate || defaultDate)}" required></div>
             <div class="col-12"><label class="form-label">Notes</label><textarea class="form-control" name="notes" rows="2">${escapeHtml(record?.notes || "")}</textarea></div>
-            <div class="col-12"><div class="d-flex justify-content-between align-items-center mb-2"><h3 class="h6 mb-0">Assistance items</h3><button class="btn btn-sm btn-outline-success" type="button" id="addDistributionItem">Add item</button></div><div class="table-responsive"><table class="table"><thead><tr><th>Assistance item</th><th>Category</th><th>Quantity / Available stock</th><th>Unit</th><th></th></tr></thead><tbody id="distributionItems"></tbody></table></div></div>
+            <div class="col-12"><div class="d-flex justify-content-between align-items-center mb-2"><h3 class="h6 mb-0">Assistance items</h3><button class="btn btn-sm btn-outline-success" type="button" id="addDistributionItem">Add item</button></div><div class="table-responsive"><table class="table distribution-items-table"><colgroup><col class="col-di-item"><col class="col-di-category"><col class="col-di-qty"><col class="col-di-unit"><col class="col-di-target"><col class="col-di-remove"></colgroup><thead><tr><th>Assistance item</th><th>Category</th><th>Quantity / Available stock</th><th>Unit</th><th>Target month/year</th><th></th></tr></thead><tbody id="distributionItems"></tbody></table></div></div>
         </div></div>`}
         <div class="modal-footer"><button class="btn btn-light" type="button" data-bs-dismiss="modal">Close</button>${readOnly ? "" : '<button class="btn btn-success" type="submit">Save Distribution</button>'}</div>
     </form></div></div></div>`;
@@ -541,6 +550,7 @@ async function openDistributionModal(mode, id) {
             hiddenInput.value = "";
             input.classList.remove("is-valid");
             clearBtn.hidden = true;
+            document.getElementById("farmerSearchCheck").hidden = true;
             feedback.textContent = "";
         };
         const selectFarmer = farmer => {
@@ -548,8 +558,9 @@ async function openDistributionModal(mode, id) {
             input.value = farmer.fullName;
             input.classList.add("is-valid");
             clearBtn.hidden = false;
+            document.getElementById("farmerSearchCheck").hidden = false;
             menu.hidden = true;
-            feedback.textContent = `Selected: ${farmer.fullName} · ${formatFarmerId(farmer.farmerId)}`;
+            feedback.textContent = `Selected: ${farmer.fullName}`;
         };
         input.addEventListener("input", () => {
             clearSelection();
@@ -568,7 +579,7 @@ async function openDistributionModal(mode, id) {
                         menu.hidden = false;
                         return;
                     }
-                    menu.innerHTML = results.map(farmer => `<button class="farmer-search-item" type="button" data-farmer-id="${farmer.farmerId}"><strong>${escapeHtml(farmer.fullName)}</strong><span>${escapeHtml(farmer.barangay || "—")} · Farmer ID: ${escapeHtml(formatFarmerId(farmer.farmerId))}</span></button>`).join("");
+                    menu.innerHTML = results.map(farmer => `<button class="farmer-search-item" type="button" data-farmer-id="${farmer.farmerId}"><strong>${escapeHtml(farmer.fullName)}</strong><span>${escapeHtml(farmer.barangay || "—")}</span></button>`).join("");
                     menu.hidden = false;
                     menu.querySelectorAll("[data-farmer-id]").forEach(button => button.addEventListener("click", () => {
                         const farmer = results.find(f => Number(f.farmerId) === Number(button.dataset.farmerId));
@@ -588,20 +599,28 @@ async function openDistributionModal(mode, id) {
         if (selectedFarmer) {
             input.classList.add("is-valid");
             clearBtn.hidden = false;
-            feedback.textContent = `Selected: ${selectedFarmer.fullName} · ${formatFarmerId(selectedFarmer.farmerId)}`;
+            document.getElementById("farmerSearchCheck").hidden = false;
+            feedback.textContent = `Selected: ${selectedFarmer.fullName}`;
         }
 
         const itemBody = document.getElementById("distributionItems");
         const appendItem = item => {
             const row = document.createElement("tr");
+            const targetDate = item?.targetMonitoringDate ? String(item.targetMonitoringDate) : `${defaultTargetYear}-${defaultTargetMonth}-01`;
+            const targetMonth = targetDate.slice(5, 7);
             row.innerHTML = `<td><select class="form-select" name="supplyId" required>${supplySelect(item?.supplyId)}</select></td>
                 <td class="distribution-category">${escapeHtml(supplyCategory(item?.supplyId) || "—")}</td>
                 <td><input class="form-control" name="quantity" type="number" min="0.001" step="0.001" value="${escapeHtml(item?.quantity ?? "")}" required>
                     <div class="stock-available small" data-stock-available></div>
                     <div class="stock-feedback small" data-stock-feedback></div></td>
                 <td class="distribution-unit">${escapeHtml(item?.unitOfMeasure || "")}</td>
+                <td class="target-cell"><div class="target-controls">
+                    <div class="target-field"><span class="target-label">Month</span><select class="form-select form-select-sm" name="targetMonth" aria-label="Target month" title="Target month">${monthOptions}</select></div>
+                    <div class="target-field"><span class="target-label">Year</span><input class="form-control form-control-sm" name="targetYear" type="number" min="2000" max="2100" value="${escapeHtml(targetDate.slice(0, 4))}" aria-label="Target year" title="Target year"></div>
+                </div></td>
                 <td><button class="btn btn-sm btn-outline-danger" type="button" data-remove-item aria-label="Remove item"><i class="bi bi-trash"></i></button></td>`;
             itemBody.appendChild(row);
+            row.querySelector('[name="targetMonth"]').value = targetMonth;
             const select = row.querySelector('[name="supplyId"]');
             const quantityInput = row.querySelector('[name="quantity"]');
             const stockEl = row.querySelector("[data-stock-available]");
@@ -671,11 +690,16 @@ async function openDistributionModal(mode, id) {
                 showToast("Correct the invalid assistance item before saving.", "danger");
                 return;
             }
+            if (!rows.every(row => /^\d{4}$/.test(row.querySelector('[name="targetYear"]').value))) {
+                showToast("Enter a valid target monitoring year.", "danger");
+                return;
+            }
             const items = rows.map(row => ({
                 supplyId: Number(row.querySelector('[name="supplyId"]').value),
                 quantity: Number(row.querySelector('[name="quantity"]').value),
                 unitCost: 0,
-                lotNumber: null
+                lotNumber: null,
+                targetMonitoringDate: `${row.querySelector('[name="targetYear"]').value}-${row.querySelector('[name="targetMonth"]').value}-01`
             }));
             if (new Set(items.map(item => item.supplyId)).size !== items.length) {
                 showToast("Each supply can only appear once in a distribution.", "danger");
@@ -734,26 +758,60 @@ async function renderRiseDashboard() {
 let utilRows = [];
 let utilFarmers = [];
 let utilDistributionDates = new Map();
+let utilTargetMonths = 3;
 let utilActiveTab = "to-monitor";
 const utilTabFilters = {
-    "to-monitor": { search: "", barangay: "", status: "" },
-    "monitored": { search: "", barangay: "", status: "" }
+    "to-monitor": { search: "", barangay: "", year: "", status: "" },
+    "monitored": { search: "", barangay: "", year: "", status: "" }
 };
 let refreshUtilFarmerModal = null;
 
+function monitoringTargetInfo(item, today = new Date()) {
+    const stored = item.targetMonitoringDate;
+    let target;
+    if (stored && stored !== "0001-01-01") {
+        target = new Date(`${stored}T00:00:00`);
+    } else {
+        const source = utilDistributionDates.get(Number(item.distributionId)) || "";
+        if (!source) return null;
+        target = new Date(`${source}T00:00:00`);
+        target.setMonth(target.getMonth() + utilTargetMonths);
+    }
+    const targetDate = target.toISOString().slice(0, 10);
+    const days = Math.ceil((target.getTime() - today.getTime()) / 86400000);
+    const monitoredDate = item.monitoringDate && item.monitoringDate !== "0001-01-01" ? String(item.monitoringDate) : null;
+    return {
+        targetDate,
+        days,
+        monitored: item.utilizationMonitoringId !== 0,
+        monitoredDate,
+        late: Boolean(monitoredDate && monitoredDate > targetDate)
+    };
+}
+
 function utilizationItemStatus(item) {
-    if (item.utilizationMonitoringId === 0) return { label: "Not monitored", cssClass: "util-status-none" };
-    return item.unreportedQuantity > 0
-        ? { label: "Incomplete", cssClass: "util-status-partial" }
-        : { label: "Complete", cssClass: "util-status-complete" };
+    const info = monitoringTargetInfo(item);
+    if (info && !info.monitored && info.days < 0) return { label: "Overdue", cssClass: "util-status-overdue" };
+    if (info && !info.monitored && info.days <= 30) return { label: "Due soon", cssClass: "util-status-due-soon" };
+    if (!info && item.utilizationMonitoringId === 0) return { label: "Not monitored", cssClass: "util-status-none" };
+    if (info && info.late) return { label: "Late", cssClass: "util-status-late" };
+    if (item.unreportedQuantity > 0) return { label: "Incomplete", cssClass: "util-status-partial" };
+    return { label: "Complete", cssClass: "util-status-complete" };
 }
 
 function utilizationFarmerStatus(items) {
     const monitored = items.filter(item => item.utilizationMonitoringId !== 0);
-    if (monitored.length === 0) return { label: "Not Monitored", cssClass: "util-status-none" };
-    if (monitored.length === items.length && items.every(item => item.unreportedQuantity === 0))
-        return { label: "Complete", cssClass: "util-status-complete" };
-    return { label: "Partially Monitored", cssClass: "util-status-partial" };
+    const overdue = items.some(item => { const info = monitoringTargetInfo(item); return info && !info.monitored && info.days < 0; });
+    const late = items.some(item => { const info = monitoringTargetInfo(item); return info && info.late; });
+    if (monitored.length === 0) return overdue
+        ? { label: "Overdue", cssClass: "util-status-overdue" }
+        : { label: "Not Monitored", cssClass: "util-status-none" };
+    if (monitored.length === items.length && items.every(item => item.unreportedQuantity === 0)) return late
+        ? { label: "Completed Late", cssClass: "util-status-late" }
+        : { label: "Complete", cssClass: "util-status-complete" };
+    return overdue
+        ? { label: "Overdue", cssClass: "util-status-overdue" }
+        : { label: "Partially Monitored", cssClass: "util-status-partial" };
 }
 
 function openUtilizationFarmerModal(farmerId) {
@@ -763,6 +821,10 @@ function openUtilizationFarmerModal(farmerId) {
     const pendingOnly = utilActiveTab === "to-monitor";
     const needsMonitoring = row => row.utilizationMonitoringId === 0 || Number(row.unreportedQuantity) > 0;
     const farmerMeta = [farmer.barangay, farmer.municipality, farmer.contactNumber].filter(Boolean).map(value => escapeHtml(value)).join(" · ");
+    const itemCategories = [...new Set(items.map(item => item.categoryName).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    const itemYears = [...new Set(items.map(item => item.monitoringDate).filter(date => date && date !== "0001-01-01").map(date => String(date).slice(0, 4)))].sort().reverse();
+    const monthOptions = [["01", "January"], ["02", "February"], ["03", "March"], ["04", "April"], ["05", "May"], ["06", "June"], ["07", "July"], ["08", "August"], ["09", "September"], ["10", "October"], ["11", "November"], ["12", "December"]].map(([value, label]) => `<option value="${value}">${label}</option>`).join("");
+    const itemFilters = { month: "", year: "", category: "" };
     document.getElementById("utilizationFarmerModalHost")?.remove();
     const host = document.createElement("div");
     host.id = "utilizationFarmerModalHost";
@@ -770,29 +832,41 @@ function openUtilizationFarmerModal(farmerId) {
         <div class="modal-header"><div><p class="eyebrow mb-1">FARMER UTILIZATION</p><h2 class="modal-title fs-5">${escapeHtml(farmerName)}</h2>
             <p class="mb-0 small"${farmerMeta ? "" : " hidden"}>${farmerMeta}</p></div>
             <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button></div>
-        <div class="modal-body" id="utilFarmerItems"></div>
+        <div class="modal-body">${pendingOnly ? "" : `<form class="filter-bar" id="utilItemFilter">
+            <select class="form-select" id="utilItemMonth"><option value="">All Months</option>${monthOptions}</select>
+            <select class="form-select" id="utilItemYear"><option value="">All Years</option>${itemYears.map(year => `<option value="${year}">${year}</option>`).join("")}</select>
+            <select class="form-select" id="utilItemCategory"><option value="">All Categories</option>${itemCategories.map(category => `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`).join("")}</select>
+            <button class="btn btn-light" type="button" id="utilItemClear">Clear</button>
+            <span class="text-muted small align-self-center">Month / year / category</span>
+        </form>`}<div id="utilFarmerItems"></div></div>
         <div class="modal-footer"><button class="btn btn-light" type="button" data-bs-dismiss="modal">Close</button></div>
     </div></div></div>`;
     document.body.appendChild(host);
     const itemHost = host.querySelector("#utilFarmerItems");
 
     const renderFarmerItems = () => {
-        const currentItems = utilRows.filter(row => Number(row.farmerId) === farmerId && (!pendingOnly || needsMonitoring(row))).sort((a, b) => {
+        const currentItems = utilRows.filter(row => Number(row.farmerId) === farmerId && (!pendingOnly || needsMonitoring(row)) &&
+            (!itemFilters.category || row.categoryName === itemFilters.category) &&
+            (!itemFilters.month || (row.monitoringDate && row.monitoringDate !== "0001-01-01" && String(row.monitoringDate).slice(5, 7) === itemFilters.month)) &&
+            (!itemFilters.year || (row.monitoringDate && row.monitoringDate !== "0001-01-01" && String(row.monitoringDate).slice(0, 4) === itemFilters.year))).sort((a, b) => {
             const rank = item => item.utilizationMonitoringId === 0 ? 0 : (item.unreportedQuantity > 0 ? 1 : 2);
             const dateA = String(utilDistributionDates.get(Number(a.distributionId)) || "");
             const dateB = String(utilDistributionDates.get(Number(b.distributionId)) || "");
             return rank(a) - rank(b) || dateB.localeCompare(dateA) || String(a.itemName).localeCompare(String(b.itemName));
         });
         itemHost.innerHTML = currentItems.length ? `<div class="table-responsive"><table class="table align-middle util-child-table">
-            <thead><tr><th class="tl">Distributed supply</th><th class="tc">Received</th><th class="tc">Used</th><th class="tc">Stocked</th><th class="tc">Disposed</th><th class="tc">Status</th><th class="tc">Actions</th></tr></thead>
+            <thead><tr><th class="tl">Distributed supply</th><th class="tc">Received${pendingOnly ? "" : "</th><th class=\"tc\">Used</th><th class=\"tc\">Stocked</th><th class=\"tc\">Disposed</th><th class=\"tc\">Monitored"}</th><th class="tc">Status</th><th class="tc">Actions</th></tr></thead>
             <tbody>${currentItems.map(item => {
                 const itemStatus = utilizationItemStatus(item);
+                const targetInfo = monitoringTargetInfo(item);
+                const targetNote = targetInfo ? `Target: ${escapeHtml(targetInfo.targetDate)} · ${targetInfo.days < 0 ? `${Math.abs(targetInfo.days)}d overdue` : `${targetInfo.days}d left`}${targetInfo.late ? " · monitored late" : ""}` : "";
                 return `<tr>
-                    <td class="tl col-text-wrap">${escapeHtml(item.itemName)}</td>
+                    <td class="tl col-text-wrap">${escapeHtml(item.itemName)}${targetNote ? `<div class="small text-muted">${targetNote}</div>` : ""}</td>
                     <td class="tc">${escapeHtml(item.receivedQuantity)} ${escapeHtml(item.unit)}</td>
-                    <td class="tc">${item.quantityUsed ?? "—"}</td>
+${pendingOnly ? "" : `<td class="tc">${item.quantityUsed ?? "—"}</td>
                     <td class="tc">${item.quantityStillStocked ?? "—"}</td>
                     <td class="tc">${item.quantityDisposed ?? "—"}</td>
+                    <td class="tc col-text-nowrap">${item.monitoringDate && item.monitoringDate !== "0001-01-01" ? escapeHtml(new Date(`${item.monitoringDate}T00:00:00`).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" })) : "—"}</td>`}
                     <td class="tc"><span class="util-status-badge ${itemStatus.cssClass}"><span class="status-dot"></span>${escapeHtml(itemStatus.label)}</span></td>
                     <td class="tc"><button class="btn btn-sm btn-outline-success" type="button" data-util-edit="${item.distributionItemId}">${item.utilizationMonitoringId === 0 ? "Monitor" : "Update"}</button></td>
                 </tr>`;
@@ -808,6 +882,28 @@ function openUtilizationFarmerModal(farmerId) {
         }));
     };
 
+    document.getElementById("utilItemMonth")?.addEventListener("change", () => {
+        itemFilters.month = document.getElementById("utilItemMonth").value;
+        renderFarmerItems();
+    });
+    document.getElementById("utilItemYear")?.addEventListener("change", () => {
+        itemFilters.year = document.getElementById("utilItemYear").value;
+        renderFarmerItems();
+    });
+    document.getElementById("utilItemCategory")?.addEventListener("change", () => {
+        itemFilters.category = document.getElementById("utilItemCategory").value;
+        renderFarmerItems();
+    });
+    document.getElementById("utilItemClear")?.addEventListener("click", () => {
+        itemFilters.month = "";
+        itemFilters.year = "";
+        itemFilters.category = "";
+        document.getElementById("utilItemMonth").value = "";
+        document.getElementById("utilItemYear").value = "";
+        document.getElementById("utilItemCategory").value = "";
+        renderFarmerItems();
+    });
+
     refreshUtilFarmerModal = renderFarmerItems;
     renderFarmerItems();
     const modal = new bootstrap.Modal(host.querySelector(".modal"));
@@ -819,11 +915,13 @@ function openUtilizationFarmerModal(farmerId) {
 }
 
 async function renderUtilizationModule(errorMessage = "") {
-    const filters = utilTabFilters[utilActiveTab] || (utilTabFilters[utilActiveTab] = { search: "", barangay: "", status: "" });
+    const filters = utilTabFilters[utilActiveTab] || (utilTabFilters[utilActiveTab] = { search: "", barangay: "", year: "", status: "" });
     const search = document.getElementById("utilSearch")?.value.trim() ?? filters.search;
     const status = document.getElementById("utilStatus")?.value ?? filters.status;
+    const year = document.getElementById("utilYear")?.value.trim() ?? filters.year;
     filters.search = search;
     filters.status = status;
+    filters.year = year;
 
     try {
         [utilRows, utilFarmers] = await Promise.all([api.get("/utilization"), api.get("/farmers")]);
@@ -837,6 +935,13 @@ async function renderUtilizationModule(errorMessage = "") {
         utilDistributionDates = new Map(distributions.map(d => [Number(d.distributionId), d.distributionDate]));
     } catch {
         utilDistributionDates = new Map();
+    }
+
+    try {
+        const settings = await api.get("/utilization/settings");
+        utilTargetMonths = Number(settings?.targetMonths) || 3;
+    } catch {
+        utilTargetMonths = 3;
     }
 
     const farmersById = new Map(utilFarmers.map(f => [Number(f.farmerId), f]));
@@ -856,6 +961,11 @@ async function renderUtilizationModule(errorMessage = "") {
             const date = utilDistributionDates.get(Number(item.distributionId));
             return date && String(date) > latest ? String(date) : latest;
         }, "");
+        const lastMonitoredDate = items.reduce((latest, item) => {
+            const date = item.monitoringDate && item.monitoringDate !== "0001-01-01" ? String(item.monitoringDate) : "";
+            return date > latest ? date : latest;
+        }, "");
+        const overdue = items.some(item => { const info = monitoringTargetInfo(item); return info && !info.monitored && info.days < 0; });
         return {
             farmerId,
             farmer,
@@ -865,50 +975,62 @@ async function renderUtilizationModule(errorMessage = "") {
             itemsToMonitor: needsAttention,
             summary: utilizationFarmerStatus(items),
             priority,
-            latestDistributionDate
+            latestDistributionDate,
+            lastMonitoredDate,
+            overdue
         };
     });
 
     // Tab membership comes from actual distribution/monitoring records, never from labels.
     const toMonitorCount = allGroups.filter(group => group.itemsToMonitor > 0).length;
     const monitoredCount = allGroups.filter(group => group.itemsToMonitor === 0).length;
+    const overdueCount = allGroups.filter(group => group.overdue).length;
     const term = search.trim().toLowerCase();
     const groups = allGroups
         .filter(group => utilActiveTab === "monitored" ? group.itemsToMonitor === 0 : group.itemsToMonitor > 0)
         .filter(group => {
+            if (utilActiveTab === "monitored" && year && !String(group.lastMonitoredDate || "").startsWith(year)) return false;
             if (term) {
                 const haystack = [group.farmerName, group.farmer.firstName, group.farmer.lastName,
                     group.farmer.middleName, group.farmer.barangay, group.farmer.municipality, group.farmer.province,
                     group.farmer.contactNumber, ...group.items.map(item => item.itemName)].filter(Boolean).join(" ").toLowerCase();
                 if (!haystack.includes(term)) return false;
             }
-            if (status) {
-                if (status === "Incomplete") return group.summary.label === "Partially Monitored";
+            if (utilActiveTab === "to-monitor" && status) {
+                if (status === "Not Monitored") return group.monitoredCount === 0;
+                if (status === "Partially Monitored") return group.monitoredCount > 0 && group.itemsToMonitor > 0;
                 return group.summary.label === status;
             }
             return true;
         })
-        .sort((a, b) => a.farmerName.localeCompare(b.farmerName, undefined, { sensitivity: "base" }));
+        .sort((a, b) => Number(b.overdue) - Number(a.overdue) ||
+            a.farmerName.localeCompare(b.farmerName, undefined, { sensitivity: "base" }));
 
     mainContent.innerHTML = `<div class="view-header"><div><h2>Utilization Monitoring</h2><p>Monitor distributed supplies by farmer. Unfinished records are listed first.</p></div></div>
         ${errorMessage ? `<div class="alert alert-danger">${escapeHtml(errorMessage)}</div>` : ""}
         <div class="util-tabs" role="tablist">
             <button class="util-tab${utilActiveTab === "to-monitor" ? " active" : ""}" type="button" data-util-tab="to-monitor" role="tab" aria-selected="${utilActiveTab === "to-monitor"}">To Monitor <span class="util-tab-counter">${toMonitorCount}</span></button>
             <button class="util-tab util-tab-monitored${utilActiveTab === "monitored" ? " active" : ""}" type="button" data-util-tab="monitored" role="tab" aria-selected="${utilActiveTab === "monitored"}"><i class="bi bi-check-circle me-1"></i>Monitored <span class="util-tab-counter">${monitoredCount}</span></button>
+            <span class="util-overdue-count" title="Farmers with supplies past the monitoring target date"><i class="bi bi-exclamation-triangle me-1"></i>Overdue: ${overdueCount}</span>
         </div>
-        <section class="content-panel"><form class="filter-bar" id="utilFilter">
+        <section class="content-panel">${utilActiveTab === "to-monitor" ? `<form class="filter-bar" id="utilFilter">
             <input id="utilSearch" class="form-control" type="search" value="${escapeHtml(search)}" placeholder="Search farmer name, barangay or supply">
-            <select id="utilStatus" class="form-select"><option value="">All Status</option>${["Not Monitored", "Partially Monitored", "Complete"].map(x => `<option value="${x}"${status === x ? " selected" : ""}>${x}</option>`).join("")}</select>
+            <select id="utilStatus" class="form-select"><option value="">All Status</option>${["Not Monitored", "Partially Monitored"].map(x => `<option value="${x}"${status === x ? " selected" : ""}>${x}</option>`).join("")}</select>
             <button class="btn btn-success">Filter</button>
-        </form><div class="table-responsive"><table class="table align-middle utilization-table">
-            <thead><tr><th class="tl">Farmer Name</th><th class="tl">Barangay</th><th class="tc">${utilActiveTab === "monitored" ? "Items Monitored" : "Items to Monitor"}</th><th class="tc">Status</th><th class="tc">Action</th></tr></thead>
+        </form>` : `<form class="filter-bar" id="utilFilter">
+            <input id="utilSearch" class="form-control" type="search" value="${escapeHtml(search)}" placeholder="Search farmer name or supply">
+            <input id="utilYear" class="form-control" type="number" min="2000" max="2100" value="${escapeHtml(year)}" placeholder="Year monitored">
+            <button class="btn btn-success">Filter</button>
+        </form>`}<div class="table-responsive"><table class="table align-middle utilization-table">
+            <thead><tr><th class="tl">Farmer Name</th><th class="tl">Barangay</th><th class="tc">${utilActiveTab === "monitored" ? "Items Monitored" : "Items to Monitor"}</th>${utilActiveTab === "monitored" ? `<th class="tc">Last Monitored</th>` : ""}<th class="tc">Status</th><th class="tc">Action</th></tr></thead>
             <tbody>${groups.length ? groups.map(group => `<tr>
                 <td class="tl col-text-wrap">${escapeHtml(group.farmerName)}</td>
                 <td class="tl col-text-wrap">${escapeHtml(group.farmer.barangay || "—")}</td>
                 <td class="tc">${utilActiveTab === "monitored" ? group.monitoredCount : group.itemsToMonitor}</td>
+                ${utilActiveTab === "monitored" ? `<td class="tc col-text-nowrap">${group.lastMonitoredDate ? escapeHtml(new Date(`${group.lastMonitoredDate}T00:00:00`).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" })) : "—"}</td>` : ""}
                 <td class="tc"><span class="util-status-badge ${group.summary.cssClass}"><span class="status-dot"></span>${escapeHtml(group.summary.label)}</span></td>
                 <td class="tc action-buttons"><button class="btn btn-sm btn-outline-success" type="button" data-util-farmer-monitor="${group.farmerId}">${utilActiveTab === "monitored" ? "View" : (group.monitoredCount === 0 ? "Monitor" : "Continue")}</button></td>
-            </tr>`).join("") : `<tr><td colspan="5" class="empty-state">No farmers match this filter.</td></tr>`}</tbody>
+            </tr>`).join("") : `<tr><td colspan="${utilActiveTab === "monitored" ? "6" : "5"}" class="empty-state">No farmers match this filter.</td></tr>`}</tbody>
         </table></div></section>`;
 
     document.querySelectorAll("[data-util-tab]").forEach(tab => tab.addEventListener("click", () => {

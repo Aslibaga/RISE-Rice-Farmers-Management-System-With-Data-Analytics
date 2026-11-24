@@ -14,12 +14,18 @@ public sealed class UtilizationController : ControllerBase
 {
     private readonly RiseDbContext _db;
     private readonly ILogger<UtilizationController> _logger;
+    private readonly IConfiguration _configuration;
 
-    public UtilizationController(RiseDbContext db, ILogger<UtilizationController> logger)
+    public UtilizationController(RiseDbContext db, ILogger<UtilizationController> logger, IConfiguration configuration)
     {
         _db = db;
         _logger = logger;
+        _configuration = configuration;
     }
+
+    [HttpGet("settings")]
+    public IActionResult GetSettings() =>
+        Ok(new { targetMonths = _configuration.GetValue<int>("Monitoring:TargetMonths", 3) });
 
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<UtilizationDto>>> Get(
@@ -48,6 +54,9 @@ public sealed class UtilizationController : ControllerBase
                 LastName = item.Distribution.Farmer.LastName,
                 MiddleName = item.Distribution.Farmer.MiddleName,
                 item.Supply.Name, Unit = item.Supply.UnitOfMeasure, Received = item.Quantity,
+                Category = item.Supply.Category == null ? null : item.Supply.Category.Name,
+                DistributionDate = item.Distribution.DistributionDate,
+                TargetMonitoringDate = item.TargetMonitoringDate,
                 Monitoring = item.UtilizationMonitoring
             }).ToListAsync(ct);
 
@@ -61,7 +70,8 @@ public sealed class UtilizationController : ControllerBase
                 row.Name, row.Unit, row.Received, m?.QuantityUsed, m?.QuantityStillStocked,
                 m?.QuantityNotYetUsed, m?.QuantityDisposed,
                 Math.Max(0, row.Received - reported), m?.MonitoringDate ?? DateOnly.MinValue,
-                m?.Remarks);
+                m?.Remarks, row.Category,
+                row.TargetMonitoringDate ?? row.DistributionDate.AddMonths(_configuration.GetValue<int>("Monitoring:TargetMonths", 3)));
         }).ToList();
 
         if (!string.IsNullOrWhiteSpace(status))

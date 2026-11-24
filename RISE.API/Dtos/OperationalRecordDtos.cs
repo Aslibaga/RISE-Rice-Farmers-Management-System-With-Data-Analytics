@@ -236,6 +236,8 @@ public sealed class DistributionItemWriteDto
 
     [StringLength(100)]
     public string? LotNumber { get; set; }
+
+    public DateOnly? TargetMonitoringDate { get; set; }
 }
 
 public sealed record DistributionItemDto(
@@ -245,7 +247,8 @@ public sealed record DistributionItemDto(
     string UnitOfMeasure,
     decimal Quantity,
     decimal UnitCost,
-    string? LotNumber);
+    string? LotNumber,
+    DateOnly? TargetMonitoringDate);
 
 public sealed record DistributionDto(
     int DistributionId,

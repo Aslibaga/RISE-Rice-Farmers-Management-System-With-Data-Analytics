@@ -148,6 +148,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     transform: scale(1.08);
 }
 
+.sidebar-expand-floating { display: none !important; position: fixed; top: 16px; left: 12px; z-index: 1040; box-shadow: var(--glass-shadow-sm); }
+body.sidebar-collapsed .sidebar-expand-floating { display: grid !important; }
+body.sidebar-collapsed .glass-sidebar .sidebar-collapse-btn { display: none !important; }
+
 .brand > div:not(.brand-mark) { min-width: 0; flex: 1 1 auto; }
 
 .brand-mark {
@@ -893,6 +897,19 @@ body.sidebar-collapsed .app-shell {
     font-size: 13px;
     font-weight: 600;
 }
+.stat-card-action { flex: 0 0 auto; padding: 3px 8px; border-radius: 7px; border: 1px solid rgba(229, 179, 61, 0.45); background: rgba(229, 179, 61, 0.08); color: var(--rice-gold-bright); font-size: 10px; font-weight: 800; line-height: 1.2; white-space: nowrap; cursor: pointer; transition: all 0.2s ease; }
+.stat-card-action:hover { color: var(--deep-forest); background: var(--rice-gold); border-color: var(--rice-gold-bright); }
+.stat-card-badge { position: absolute; right: 12px; bottom: 8px; display: inline-flex; align-items: center; margin: 0; padding: 1px 6px; border-radius: 999px; font-size: 9px; font-weight: 800; color: #fca59d; background: rgba(224, 99, 85, 0.16); border: 1px solid rgba(224, 99, 85, 0.4); }
+
+.season-confirm { border: 1px solid rgba(229, 179, 61, 0.45); }
+.season-confirm-body { padding: 28px 28px 18px; text-align: center; }
+.season-confirm-icon { display: grid; place-items: center; width: 56px; height: 56px; margin: 0 auto 14px; border-radius: 50%; color: var(--deep-forest); background: linear-gradient(135deg, #f4d06a, #d89e24); font-size: 28px; box-shadow: 0 6px 18px rgba(229, 179, 61, 0.35); }
+.season-confirm-title { margin: 0 0 8px; color: var(--white); font-family: var(--font-heading); font-size: 18px; font-weight: 800; }
+.season-confirm-text { margin: 0 auto 18px; max-width: 380px; color: var(--muted-white); font-size: 13px; line-height: 1.5; }
+.season-confirm-details { display: flex; gap: 10px; justify-content: center; text-align: left; }
+.season-confirm-details > div { flex: 1 1 150px; padding: 10px 14px; border: 1px solid var(--glass-border); border-radius: 12px; background: rgba(0, 0, 0, 0.12); }
+.season-confirm-details span { display: block; color: var(--muted-white); font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.season-confirm-details strong { display: block; margin-top: 4px; color: var(--rice-gold-bright); font-size: 14px; }
 
 .stat-card strong {
     display: block;
@@ -1786,6 +1803,27 @@ body.sidebar-collapsed .app-shell {
 
 [hidden] { display: none !important; }
 
+.topbar-season { display: inline-flex; align-items: center; padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 800; color: var(--rice-gold-bright); background: rgba(229, 179, 61, 0.1); border: 1px solid rgba(229, 179, 61, 0.35); white-space: nowrap; }
+
+.notification-button { position: relative !important; }
+.notification-count { position: absolute; top: -5px; right: -5px; display: grid; place-items: center; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; color: #fff; background: var(--danger); border: 1px solid rgba(255,255,255,0.4); font-size: 10px; font-weight: 800; line-height: 1; }
+.notification-button:hover .bi-bell { color: var(--rice-gold-bright); }
+.notification-card { position: fixed; top: 62px; right: 22px; z-index: 1095; width: 370px; max-width: calc(100vw - 28px); max-height: 70vh; display: flex; flex-direction: column; border: 1px solid var(--glass-border-strong); border-radius: 16px; background: linear-gradient(160deg, rgba(16, 48, 32, 0.99), rgba(10, 32, 21, 0.99)); box-shadow: var(--glass-shadow-lg); overflow: hidden; }
+.notification-card-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--glass-border); color: var(--white); }
+.notification-card-list { overflow-y: auto; padding: 6px; }
+.notification-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px; border-radius: 10px; color: var(--muted-white); cursor: pointer; transition: background 0.2s ease, transform 0.2s ease; }
+.notification-item:hover { background: rgba(229, 179, 61, 0.12); transform: translateX(2px); }
+.notification-item:focus-visible { outline: 2px solid var(--rice-gold-bright); outline-offset: -2px; }
+.notification-item.unread { background: rgba(229, 179, 61, 0.08); }
+.notification-item-icon { flex: 0 0 auto; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: var(--rice-gold-bright); background: rgba(229, 179, 61, 0.14); }
+.notification-item-body { flex: 1 1 auto; min-width: 0; }
+.notification-item-body strong { display: block; color: var(--white); font-size: 13px; }
+.notification-item-body p { margin: 3px 0; font-size: 12px; line-height: 1.4; }
+.notification-item-body small { color: rgba(208, 221, 211, 0.7); font-size: 10.5px; }
+.notification-card-footer { padding: 10px 16px; border-top: 1px solid var(--glass-border); text-align: center; }
+.notification-card-footer a { color: var(--rice-gold-bright); font-size: 12px; font-weight: 700; text-decoration: none; }
+.notification-card-footer a:hover { text-decoration: underline; }
+
 .view-header > .btn, .header-add-button { min-height: 42px; padding: 0 20px; }
 .view-header > .d-flex { flex: 0 0 auto; margin-left: auto; }
 .view-header > .d-flex .btn { min-height: 42px; padding: 0 20px; }
@@ -1974,6 +2012,16 @@ input[name="quantity"].is-invalid { border-color: var(--danger) !important; }
 .target-controls select, .target-controls input { width: 100%; min-height: 38px; }
 #profileModal dl.modal-body > dt, #profileModal dl.modal-body > dd { margin-bottom: 10px; }
 
+/* Distribution Schedule Monitoring (additive) */
+#distributionScheduleSection { margin-top: 26px; }
+#distributionScheduleSection .stat-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 991.98px) { #distributionScheduleSection .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { #distributionScheduleSection .stat-grid { grid-template-columns: 1fr; } }
+
+.settings-message { margin-bottom: 16px; padding: 11px 14px; border-radius: 12px; font-size: 13px; font-weight: 700; }
+.settings-message.success { color: var(--soft-mint); background: rgba(114, 168, 86, 0.16); border: 1px solid rgba(114, 168, 86, 0.42); }
+.settings-message.danger { color: #ffe4df; background: rgba(120, 36, 32, 0.75); border: 1px solid rgba(224, 99, 85, 0.45); }
+
 /* Toasts */
 .toast-container { z-index: 1090; }
 .toast {
@@ -1991,6 +2039,13 @@ input[name="quantity"].is-invalid { border-color: var(--danger) !important; }
     to { transform: translateY(0); opacity: 1; }
 }
 .toast-success { border-color: rgba(114, 168, 86, 0.5); background: rgba(12, 42, 28, 0.96); }
+.rise-toast { min-width: 290px; border-radius: 14px !important; }
+.rise-toast-success { background: linear-gradient(135deg, rgba(18, 54, 38, 0.98), rgba(10, 32, 21, 0.98)) !important; border: 1px solid var(--rice-gold) !important; box-shadow: 0 8px 28px rgba(229, 179, 61, 0.28) !important; }
+.rise-toast-error { background: rgba(74, 24, 20, 0.98) !important; border: 1px solid rgba(224, 99, 85, 0.6) !important; }
+.rise-toast-icon { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; font-size: 15px; flex: 0 0 auto; }
+.rise-toast-success .rise-toast-icon { color: var(--deep-forest); background: linear-gradient(135deg, #f4d06a, #d89e24); }
+.rise-toast-error .rise-toast-icon { color: #ffe4df; background: rgba(224, 99, 85, 0.35); }
+.rise-toast .toast-body { font-size: 13.5px; }
 
 /* View Transitions */
 #mainContent {
@@ -2025,7 +2080,7 @@ input[name="quantity"].is-invalid { border-color: var(--danger) !important; }
 }
 
 /* Utilization tabs */
-.util-tabs { display: flex; gap: 8px; padding: 0 22px; border-bottom: 1px solid var(--glass-border); }
+.util-tabs { display: flex; align-items: center; gap: 8px; padding: 0 22px 16px; border-bottom: 1px solid var(--glass-border); }
 .util-tab { display: inline-flex; align-items: center; gap: 8px; padding: 13px 18px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted-white); font-size: 13px; font-weight: 700; cursor: pointer; transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease; }
 .util-tab:hover { color: var(--white); }
 .util-tab.active { color: var(--rice-gold-bright); border-bottom-color: var(--rice-gold); background: rgba(229, 179, 61, 0.08); }

@@ -205,4 +205,77 @@ public sealed class ReportsController : ControllerBase
             .ToList();
         return Ok(report);
     }
+
+    [HttpGet("distribution-schedule")]
+    public async Task<ActionResult<IReadOnlyList<DistributionScheduleDto>>> GetDistributionSchedule(
+        [FromQuery] int? year,
+        [FromQuery] string? season,
+        [FromQuery] string? barangay,
+        [FromQuery] string? type,
+        CancellationToken cancellationToken)
+    {
+        var query = _context.Distributions
+            .AsNoTracking()
+            .Where(distribution => distribution.Farmer.IsActive)
+            .AsQueryable();
+
+        if (year.HasValue)
+            query = query.Where(distribution => distribution.DistributionDate.Year == year.Value);
+        if (!string.IsNullOrWhiteSpace(barangay))
+            query = query.Where(distribution => distribution.Farmer.Barangay != null &&
+                distribution.Farmer.Barangay.Contains(barangay));
+        if (!string.IsNullOrWhiteSpace(season))
+        {
+            var isWet = season.Trim().Equals("Wet", StringComparison.OrdinalIgnoreCase);
+            query = query.Where(distribution => isWet
+                ? distribution.DistributionDate.Month >= RISE.API.Services.DistributionScheduleHelper.WetStartMonth &&
+                  distribution.DistributionDate.Month <= RISE.API.Services.DistributionScheduleHelper.WetEndMonth
+                : distribution.DistributionDate.Month < RISE.API.Services.DistributionScheduleHelper.WetStartMonth ||
+                  distribution.DistributionDate.Month > RISE.API.Services.DistributionScheduleHelper.WetEndMonth);
+        }
+
+        var rows = await query
+            .Select(distribution => new
+            {
+                distribution.DistributionId,
+                FarmerName = distribution.Farmer.FullName,
+                distribution.DistributionDate,
+                distribution.Status,
+                distribution.FarmerId,
+                Barangay = distribution.Farmer.Barangay,
+                distribution.CreatedAtUtc,
+                Items = distribution.Items.Select(item => new
+                {
+                    item.Quantity,
+                    Category = item.Supply.Category == null ? null : item.Supply.Category.Name,
+                    item.Supply.Name
+                }).ToList()
+            })
+            .ToListAsync(cancellationToken);
+
+        var result = rows.Select(row =>
+        {
+            var categories = string.Join(" ", row.Items.Select(item => item.Category).Where(name => name != null));
+            var supplyNames = string.Join(" ", row.Items.Select(item => item.Name));
+            return new DistributionScheduleDto(
+                row.DistributionId,
+                row.FarmerName,
+                row.DistributionDate,
+                RISE.API.Services.DistributionScheduleHelper.ClassifyAssistanceType(categories, supplyNames),
+                RISE.API.Services.DistributionScheduleHelper.GetCroppingSeason(row.DistributionDate),
+                row.Items.Sum(item => item.Quantity),
+                new[] { row.FarmerId }.Distinct().Count(),
+                row.Barangay ?? "—",
+                row.Status,
+                row.CreatedAtUtc);
+        }).ToList();
+
+        if (!string.IsNullOrWhiteSpace(type))
+            result = result.Where(row => string.Equals(row.AssistanceType, type, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        return Ok(result
+            .OrderByDescending(row => row.CreatedAtUtc)
+            .ThenByDescending(row => row.DistributionId)
+            .ToList());
+    }
 }

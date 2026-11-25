@@ -16,7 +16,7 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261124144220_AddTargetMonitoringDate";
+    public override string LastMigrationId => "20261125190533_AddNotifications";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -26,6 +26,38 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
             .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
         SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+        modelBuilder.Entity("RISE.API.Models.AppSetting", b =>
+            {
+                var appSettingId = b.Property<int>("AppSettingId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
+
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(appSettingId);
+
+                b.Property<string>("Key")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(450)");
+
+                b.Property<string>("Value")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
+
+                b.HasKey("AppSettingId");
+
+                b.HasIndex("Key")
+                    .IsUnique();
+
+                b.ToTable("AppSettings");
+
+                b.HasData(
+                    new
+                    {
+                        AppSettingId = 1,
+                        Key = "ActiveSeason",
+                        Value = "2026-Wet"
+                    });
+            });
 
         modelBuilder.Entity("RISE.API.Models.AssistanceProgram", b =>
             {
@@ -507,6 +539,45 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
 
                         t.HasCheckConstraint("CK_HarvestVerificationRecords_Status", "[Status] IN (N'Pending', N'Verified', N'Rejected')");
                     });
+            });
+
+        modelBuilder.Entity("RISE.API.Models.Notification", b =>
+            {
+                var notificationId = b.Property<int>("NotificationId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
+
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(notificationId);
+
+                b.Property<DateTime>("CreatedAtUtc")
+                    .HasColumnType("datetime2");
+
+                b.Property<bool>("IsRead")
+                    .HasColumnType("bit");
+
+                b.Property<string>("Message")
+                    .IsRequired()
+                    .HasMaxLength(1000)
+                    .HasColumnType("nvarchar(1000)");
+
+                b.Property<string>("Title")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("nvarchar(200)");
+
+                b.Property<string>("Type")
+                    .IsRequired()
+                    .HasMaxLength(50)
+                    .HasColumnType("nvarchar(50)");
+
+                b.Property<int?>("UserId")
+                    .HasColumnType("int");
+
+                b.HasKey("NotificationId");
+
+                b.HasIndex("UserId", "IsRead", "CreatedAtUtc");
+
+                b.ToTable("Notifications");
             });
 
         modelBuilder.Entity("RISE.API.Models.PasswordResetToken", b =>
@@ -1016,6 +1087,56 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                     });
             });
 
+        modelBuilder.Entity("RISE.API.Models.UtilizationSeasonRecord", b =>
+            {
+                var utilizationSeasonRecordId = b.Property<int>("UtilizationSeasonRecordId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
+
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(utilizationSeasonRecordId);
+
+                b.Property<DateTime>("ArchivedAtUtc")
+                    .HasColumnType("datetime2");
+
+                b.Property<int>("DistributionItemId")
+                    .HasColumnType("int");
+
+                b.Property<DateOnly>("MonitoringDate")
+                    .HasColumnType("date");
+
+                b.Property<decimal?>("QuantityDisposed")
+                    .HasPrecision(18, 3)
+                    .HasColumnType("decimal(18,3)");
+
+                b.Property<decimal?>("QuantityNotYetUsed")
+                    .HasPrecision(18, 3)
+                    .HasColumnType("decimal(18,3)");
+
+                b.Property<decimal?>("QuantityStillStocked")
+                    .HasPrecision(18, 3)
+                    .HasColumnType("decimal(18,3)");
+
+                b.Property<decimal?>("QuantityUsed")
+                    .HasPrecision(18, 3)
+                    .HasColumnType("decimal(18,3)");
+
+                b.Property<string>("Remarks")
+                    .HasColumnType("nvarchar(max)");
+
+                b.Property<string>("SeasonKey")
+                    .IsRequired()
+                    .HasMaxLength(50)
+                    .HasColumnType("nvarchar(50)");
+
+                b.HasKey("UtilizationSeasonRecordId");
+
+                b.HasIndex("DistributionItemId");
+
+                b.HasIndex("SeasonKey", "DistributionItemId");
+
+                b.ToTable("UtilizationSeasonRecords");
+            });
+
         modelBuilder.Entity("RISE.API.Models.AuditLog", b =>
             {
                 b.HasOne("RISE.API.Models.User", "User")
@@ -1136,6 +1257,16 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                 b.Navigation("HarvestRecord");
 
                 b.Navigation("VerifiedByUser");
+            });
+
+        modelBuilder.Entity("RISE.API.Models.Notification", b =>
+            {
+                b.HasOne("RISE.API.Models.User", "User")
+                    .WithMany()
+                    .HasForeignKey("UserId")
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                b.Navigation("User");
             });
 
         modelBuilder.Entity("RISE.API.Models.PasswordResetToken", b =>
@@ -1280,6 +1411,17 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                 b.HasOne("RISE.API.Models.DistributionItem", "DistributionItem")
                     .WithOne("UtilizationMonitoring")
                     .HasForeignKey("RISE.API.Models.UtilizationMonitoring", "DistributionItemId")
+                    .OnDelete(DeleteBehavior.Restrict)
+                    .IsRequired();
+
+                b.Navigation("DistributionItem");
+            });
+
+        modelBuilder.Entity("RISE.API.Models.UtilizationSeasonRecord", b =>
+            {
+                b.HasOne("RISE.API.Models.DistributionItem", "DistributionItem")
+                    .WithMany()
+                    .HasForeignKey("DistributionItemId")
                     .OnDelete(DeleteBehavior.Restrict)
                     .IsRequired();
 

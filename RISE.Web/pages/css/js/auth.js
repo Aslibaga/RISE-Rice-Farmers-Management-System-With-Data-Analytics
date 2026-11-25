@@ -100,6 +100,7 @@
         isAuthenticated() { return authToken !== null && authUser !== null; },
         getToken() { return authToken; },
         getUser() { return authUser; },
+        setUser(user) { authUser = user; localStorage.setItem(USER_KEY, JSON.stringify(user)); notifyListeners(); },
         getRole() { return authUser?.role || null; },
         getUserName() { return authUser?.userName || null; },
         getDisplayName() { return authUser?.displayName || null; },

@@ -79,6 +79,7 @@
                     <button data-section="system"><i class="bi bi-info-circle"></i>System Information</button>
                 </div>
                 <div class="settings-content">
+                    <div id="settingsMessage" class="settings-message" hidden></div>
                     <div class="settings-section active" id="section-account">
                         <div class="settings-card mb-3">
                             <h5>Account Settings</h5>
@@ -140,7 +141,6 @@
                             <p>Manage your notification preferences.</p>
                             <div class="notif-row"><div><div class="notif-title">System Announcements</div><div class="notif-desc">Receive important system announcements.</div></div><button class="toggle" id="t1"></button></div>
                             <div class="notif-row"><div><div class="notif-title">Farmer Record Updates</div><div class="notif-desc">Receive notifications when farmer records are updated.</div></div><button class="toggle" id="t2"></button></div>
-                            <div class="notif-row"><div><div class="notif-title">New Farmer Registration</div><div class="notif-desc">Receive notifications about newly registered farmers.</div></div><button class="toggle" id="t3"></button></div>
                             <div class="notif-row"><div><div class="notif-title">Report Generation Updates</div><div class="notif-desc">Receive updates about report generation and processing.</div></div><button class="toggle" id="t4"></button></div>
                             <div class="notif-row"><div><div class="notif-title">Important System Alerts</div><div class="notif-desc">Receive important system alerts and announcements.</div></div><button class="toggle" id="t5"></button></div>
                             <button class="btn btn-gold mt-3" id="saveNotifBtn" type="button">Save Preferences</button>
@@ -218,6 +218,11 @@
                 document.getElementById('section-'+sec).classList.add('active');
             });
         });
+        if (location.hash === "#notifications") {
+            document.querySelectorAll(".settings-nav button").forEach(b=>b.classList.toggle("active", b.dataset.section === "notifications"));
+            document.querySelectorAll(".settings-section").forEach(s=>s.classList.remove("active"));
+            document.getElementById("section-notifications")?.classList.add("active");
+        }
         // account sub-sections
         document.querySelectorAll('[data-account]').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -238,7 +243,7 @@
             document.getElementById('lastLogin').textContent = user.lastLoginAtUtc ? new Date(user.lastLoginAtUtc).toLocaleString('en-US', { timeZone: 'Asia/Manila', year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit', hour12:true }) : 'Not available';
             document.getElementById('newEmail').value = user.email || '';
             document.getElementById('newUsername').value = user.userName || '';
-            const map = { t1:'notifySystemAnnouncements', t2:'notifyFarmerRecordUpdates', t3:'notifyNewFarmerRegistration', t4:'notifyReportGenerationUpdates', t5:'notifyImportantSystemAlerts' };
+            const map = { t1:'notifySystemAnnouncements', t2:'notifyFarmerRecordUpdates', t4:'notifyReportGenerationUpdates', t5:'notifyImportantSystemAlerts' };
             Object.keys(map).forEach(id => {
                 const el = document.getElementById(id);
                 const key = map[id];
@@ -246,34 +251,75 @@
                 el.addEventListener('click', () => el.classList.toggle('on'));
             });
         }
+        function showSettingsMessage(message, type) {
+            const el = document.getElementById('settingsMessage');
+            if (!el) return;
+            el.textContent = message;
+            el.className = 'settings-message ' + (type === 'danger' ? 'danger' : 'success');
+            el.hidden = false;
+            clearTimeout(showSettingsMessage.timer);
+            showSettingsMessage.timer = setTimeout(() => { el.hidden = true; }, 5000);
+        }
+        async function settingsRequest(path, body, button, successMessage) {
+            if (button) { button.disabled = true; button.dataset.originalText = button.textContent; button.textContent = 'Saving…'; }
+            try {
+                const res = await fetch('http://localhost:5000/api' + path, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + window.RISEAuth.getToken() },
+                    body: JSON.stringify(body)
+                });
+                let data = null;
+                try { data = await res.json(); } catch {}
+                if (!res.ok) {
+                    const message = data?.detail || data?.title || Object.values(data?.errors || {}).flat().join(' ') || 'Unable to save changes.';
+                    throw new Error(message);
+                }
+                showSettingsMessage(successMessage);
+                return data;
+            } catch (error) {
+                showSettingsMessage(error.message || 'Unable to save changes.', 'danger');
+                return null;
+            } finally {
+                if (button) { button.disabled = false; button.textContent = button.dataset.originalText || 'Save'; }
+            }
+        }
         document.getElementById('emailForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('newEmail').value.trim();
-            const res = await fetch('http://localhost:5000/api/auth/update-email', { method:'PUT', headers: { 'Content-Type':'application/json', 'Authorization': 'Bearer ' + window.RISEAuth.getToken() }, body: JSON.stringify({ Email: email }) });
-            alert(res.ok ? 'Email updated' : 'Failed');
+            const data = await settingsRequest('/auth/update-email', { Email: email }, e.target.querySelector('button[type="submit"]'), 'Email address updated.');
+            if (data) { const user = window.RISEAuth.getUser() || {}; user.email = email; window.RISEAuth.setUser(user); }
         });
         document.getElementById('passwordForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const body = { CurrentPassword: document.getElementById('currentPassword').value, NewPassword: document.getElementById('newPassword').value, ConfirmNewPassword: document.getElementById('confirmPassword').value };
-            const res = await fetch('http://localhost:5000/api/auth/change-password', { method:'PUT', headers: { 'Content-Type':'application/json', 'Authorization': 'Bearer ' + window.RISEAuth.getToken() }, body: JSON.stringify(body) });
-            alert(res.ok ? 'Password changed' : 'Failed');
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            if (newPassword !== confirmPassword) { showSettingsMessage('New passwords do not match.', 'danger'); return; }
+            const data = await settingsRequest('/auth/change-password', { CurrentPassword: currentPassword, NewPassword: newPassword, ConfirmNewPassword: confirmPassword }, e.target.querySelector('button[type="submit"]'), 'Password changed successfully.');
+            if (data) e.target.reset();
         });
         document.getElementById('usernameForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const username = document.getElementById('newUsername').value.trim();
-            const res = await fetch('http://localhost:5000/api/auth/change-username', { method:'PUT', headers: { 'Content-Type':'application/json', 'Authorization': 'Bearer ' + window.RISEAuth.getToken() }, body: JSON.stringify({ Username: username }) });
-            alert(res.ok ? 'Username updated' : 'Failed');
+            const data = await settingsRequest('/auth/change-username', { Username: username }, e.target.querySelector('button[type="submit"]'), 'Username updated.');
+            if (data) { const user = window.RISEAuth.getUser() || {}; user.userName = username; user.displayName = username; window.RISEAuth.setUser(user); }
         });
-        document.getElementById('saveNotifBtn').addEventListener('click', async () => {
+        document.getElementById('saveNotifBtn').addEventListener('click', async (event) => {
             const body = {
                 NotifySystemAnnouncements: document.getElementById('t1').classList.contains('on'),
                 NotifyFarmerRecordUpdates: document.getElementById('t2').classList.contains('on'),
-                NotifyNewFarmerRegistration: document.getElementById('t3').classList.contains('on'),
                 NotifyReportGenerationUpdates: document.getElementById('t4').classList.contains('on'),
                 NotifyImportantSystemAlerts: document.getElementById('t5').classList.contains('on')
             };
-            const res = await fetch('http://localhost:5000/api/auth/notifications', { method:'PUT', headers: { 'Content-Type':'application/json', 'Authorization': 'Bearer ' + window.RISEAuth.getToken() }, body: JSON.stringify(body) });
-            alert(res.ok ? 'Preferences saved' : 'Failed');
+            const data = await settingsRequest('/auth/notifications', body, event.currentTarget, 'Notification preferences saved.');
+            const updatedUser = window.RISEAuth.getUser() || {};
+            Object.assign(updatedUser, {
+                notifySystemAnnouncements: body.NotifySystemAnnouncements,
+                notifyFarmerRecordUpdates: body.NotifyFarmerRecordUpdates,
+                notifyReportGenerationUpdates: body.NotifyReportGenerationUpdates,
+                notifyImportantSystemAlerts: body.NotifyImportantSystemAlerts
+            });
+            window.RISEAuth.setUser(updatedUser);
         });
         const deleteModal = new bootstrap.Modal(document.getElementById('deleteAccountModal'));
         document.getElementById('deleteAccountBtn').addEventListener('click', () => deleteModal.show());

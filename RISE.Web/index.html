@@ -35,6 +35,7 @@
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
+        
 
         <nav class="sidebar-nav" aria-label="Primary navigation">
             <div class="nav-label">Navigation</div>
@@ -43,6 +44,7 @@
             <button class="nav-item" type="button" data-view="distribution"><i class="bi bi-box-arrow-up-right"></i><span>Assistance Distribution</span></button>
             <button class="nav-item" type="button" data-view="supplies"><i class="bi bi-box-seam"></i><span>Supply Management</span></button>
             <button class="nav-item" type="button" data-view="utilization"><i class="bi bi-clipboard-data"></i><span>Utilization Monitoring</span></button>
+            <button class="nav-item" type="button" data-view="history"><i class="bi bi-clock-history"></i><span>History</span></button>
             <button class="nav-item" type="button" data-view="reports"><i class="bi bi-file-earmark-bar-graph"></i><span>Reports &amp; Analytics</span></button>
         </nav>
         <div class="nav-label">Personal</div>
@@ -55,6 +57,10 @@
 
     </aside>
 
+    <button class="sidebar-collapse-btn sidebar-expand-floating d-none d-lg-grid" id="sidebarExpandBtn" type="button" title="Show sidebar navigation" aria-label="Show sidebar">
+        <i class="bi bi-chevron-right"></i>
+    </button>
+
     <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
     <div class="app-shell">
@@ -63,16 +69,9 @@
                 <i class="bi bi-layout-sidebar-inset"></i>
             </button>
             <div class="page-heading">
-                <nav aria-label="Breadcrumb" class="topbar-breadcrumb">
-                    <ol class="breadcrumb mb-1">
-                        <li class="breadcrumb-item"><i class="bi bi-flower1 me-1 text-gold"></i>RISE</li>
-                        <li class="breadcrumb-item active" id="breadcrumbCurrent">Dashboard</li>
-                    </ol>
-                </nav>
                 <div class="topbar-title-row">
-                    <h1 id="pageTitle" class="topbar-title">Dashboard</h1>
-
-                </div>
+                <span class="topbar-season" id="topbarSeason"><i class="bi bi-calendar3 me-1"></i> Loading season…</span>
+            </div>
             </div>
             <div class="topbar-actions">
                 <div class="global-search glass-input d-none d-lg-flex" title="Search records (press Enter to view in Farmers)">
@@ -86,9 +85,7 @@
                     <i class="bi bi-clock me-1 text-gold"></i>
                     <time class="header-clock" id="headerClock"></time>
                 </div>
-                <button class="icon-button" id="notificationButton" type="button" aria-label="Open recent system activity" title="Recent system activity">
-                    <i class="bi bi-bell"></i>
-                </button>
+                <button class="icon-button notification-button" id="notificationButton" type="button" aria-label="Open notification settings" title="Notifications"><i class="bi bi-bell"></i><span class="notification-count" id="notificationCount" hidden>0</span></button>
                 <button class="btn btn-success header-add-button" id="addRecordButton" type="button">
                     <i class="bi bi-plus-lg me-1"></i><span class="d-none d-md-inline">Add new record</span><span class="d-md-none">Add</span>
                 </button>
@@ -251,6 +248,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script src="pages/css/js/auth.js"></script>
     <script src="pages/css/js/ui-theme.js"></script>
+    <script src="pages/css/js/distribution-schedule.js"></script>
     <script src="pages/css/js/api.js"></script>
     <script>
         (function () {

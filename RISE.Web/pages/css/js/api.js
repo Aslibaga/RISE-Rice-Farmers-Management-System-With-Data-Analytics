@@ -88,11 +88,12 @@ function countBy(items, getValue) {
 function showToast(message, type = "success") {
     const container = document.getElementById("toastContainer");
     const toast = document.createElement("div");
-    toast.className = `toast align-items-center text-bg-${type} border-0`;
-    toast.setAttribute("role", "alert");
-    toast.innerHTML = `<div class="d-flex"><div class="toast-body">${escapeHtml(message)}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
+    const isSuccess = type === "success";
+    toast.className = `toast align-items-center border-0 rise-toast ${isSuccess ? "rise-toast-success" : "rise-toast-error"}`;
+    toast.setAttribute("role", "status");
+    toast.innerHTML = `<div class="d-flex align-items-center gap-2"><span class="rise-toast-icon"><i class="bi ${isSuccess ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill"}"></i></span><div class="toast-body fw-semibold">${escapeHtml(message)}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>`;
     container.appendChild(toast);
-    new bootstrap.Toast(toast, { delay: 3500 }).show();
+    new bootstrap.Toast(toast, { delay: 5000 }).show();
     toast.addEventListener("hidden.bs.toast", () => toast.remove());
 }
 
@@ -116,11 +117,14 @@ async function loadFarmers() {
 function setView(view) {
     currentView = view;
     syncHeaderAddButton();
+    updateTopbarSeason();
     document.querySelectorAll(".nav-item[data-view]").forEach(item => item.classList.toggle("active", item.dataset.view === view));
     const titles = { dashboard: "Dashboard", farmers: "Farmer Records", distribution: "Assistance Distribution",
-        supplies: "Supply Management", utilization: "Utilization Monitoring", reports: "Reports and Analytics" };
-    document.getElementById("pageTitle").textContent = titles[view] || "RISE";
-    document.getElementById("breadcrumbCurrent").textContent = titles[view] || "RISE";
+        supplies: "Supply Management", utilization: "Utilization Monitoring", history: "History", reports: "Reports and Analytics" };
+    const pageTitle = document.getElementById("pageTitle");
+    if (pageTitle) pageTitle.textContent = titles[view] || "RISE";
+    const breadcrumb = document.getElementById("breadcrumbCurrent");
+    if (breadcrumb) breadcrumb.textContent = titles[view] || "RISE";
     closeMobileNav();
     // Fade-out the current view before swapping content.
     const mainContent = document.getElementById("mainContent");
@@ -130,6 +134,7 @@ function setView(view) {
     else if (view === "distribution") renderDistributionModule();
     else if (view === "supplies") renderSupplyModule();
     else if (view === "utilization") renderUtilizationModule();
+    else if (view === "history") renderHistoryView();
     else if (view === "reports") renderRiseReports();
     // Fade-in the new view once content is in the DOM.
     requestAnimationFrame(() => {
@@ -728,28 +733,232 @@ async function openDistributionModal(mode, id) {
 }
 
 let riseCharts = [];
+let reportCharts = [];
+function renderHistoryView() {
+    mainContent.innerHTML = "";
+    if (window.RISEDistributionSchedule) window.RISEDistributionSchedule.render();
+    else mainContent.innerHTML = `<div class="alert alert-danger">History module is unavailable.</div>`;
+}
+
+function openQuantityDetailsModal(title, rows, quantityLabel) {
+    const grouped = new Map();
+    rows.forEach(row => {
+        const category = row.category || "—";
+        const unit = row.unit || "—";
+        const key = `${category}||${unit}`;
+        if (!grouped.has(key)) grouped.set(key, { category, unit, quantity: 0, date: row.date || "—", items: new Set() });
+        const group = grouped.get(key);
+        group.quantity += Number(row.quantity || 0);
+        group.items.add(row.item || "—");
+        if (String(row.date || "") > String(group.date)) group.date = row.date;
+    });
+    const summary = [...grouped.values()].sort((a, b) => String(a.category).localeCompare(String(b.category)));
+    document.getElementById("quantityDetailsHost")?.remove();
+    const host = document.createElement("div");
+    host.id = "quantityDetailsHost";
+    host.innerHTML = `<div class="modal fade" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-centered"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">${escapeHtml(title)}</h5><button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body"><div class="table-responsive"><table class="table align-middle"><thead><tr><th class="tl">Category</th><th class="tc">${escapeHtml(quantityLabel)}</th><th class="tc">Unit</th><th class="tl">Date recorded</th></tr></thead><tbody>
+            ${summary.length ? summary.map(group => `<tr><td class="tl col-text-wrap">${escapeHtml(group.category)}</td><td class="tc"><strong>${group.quantity.toLocaleString()}</strong></td><td class="tc">${escapeHtml(group.unit)}</td><td class="tl">${escapeHtml(group.date)}</td></tr>`).join("") : `<tr><td colspan="4" class="empty-state">No records found.</td></tr>`}
+        </tbody></table></div></div>
+        <div class="modal-footer"><button class="btn btn-light" type="button" data-bs-dismiss="modal">Close</button></div>
+    </div></div></div>`;
+    document.body.appendChild(host);
+    const modal = new bootstrap.Modal(host.querySelector(".modal"));
+    modal.show();
+    host.querySelector(".modal").addEventListener("hidden.bs.modal", () => host.remove());
+}
+
+async function openDistributedQuantityModal() {
+    try {
+        const [distributions, supplies, seasonInfo] = await Promise.all([api.get("/distributions"), api.get("/supplies"), api.get("/monitoring-season").catch(() => null)]);
+        const startedAt = seasonInfo?.startedAtUtc ? new Date(seasonInfo.startedAtUtc).getTime() : null;
+        const categories = new Map((supplies || []).map(supply => [Number(supply.supplyId), supply.categoryName || "—"]));
+        const rows = (distributions || []).filter(distribution =>
+            !startedAt || parseApiDate(distribution.createdAtUtc) >= startedAt)
+            .flatMap(distribution => (distribution.items || []).map(item => ({
+            item: item.supplyName || "—",
+            category: categories.get(Number(item.supplyId)) || "—",
+            quantity: item.quantity,
+            unit: item.unitOfMeasure || "—",
+            date: distribution.distributionDate || "—"
+        }))).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+        openQuantityDetailsModal("Total Quantity Distributed", rows, "Quantity distributed");
+    } catch (error) {
+        showToast(error.message, "danger");
+    }
+}
+
+async function openUsedQuantityModal() {
+    try {
+        const [utilization, distributions] = await Promise.all([api.get("/utilization"), api.get("/distributions")]);
+        const dates = new Map((distributions || []).map(distribution => [Number(distribution.distributionId), distribution.distributionDate]));
+        const rows = (utilization || []).filter(row => Number(row.quantityUsed || 0) > 0).map(row => ({
+            item: row.itemName || "—",
+            category: row.categoryName || "—",
+            quantity: row.quantityUsed,
+            unit: row.unit || "—",
+            date: dates.get(Number(row.distributionId)) || "—"
+        })).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+        openQuantityDetailsModal("Total Quantity Used", rows, "Quantity used");
+    } catch (error) {
+        showToast(error.message, "danger");
+    }
+}
+
+async function openNotUsedQuantityModal() {
+    try {
+        const [utilization, distributions] = await Promise.all([api.get("/utilization"), api.get("/distributions")]);
+        const dates = new Map((distributions || []).map(distribution => [Number(distribution.distributionId), distribution.distributionDate]));
+        const rows = (utilization || []).filter(row => Number(row.quantityNotYetUsed || 0) > 0).map(row => ({
+            item: row.itemName || "—",
+            category: row.categoryName || "—",
+            quantity: row.quantityNotYetUsed,
+            unit: row.unit || "—",
+            date: dates.get(Number(row.distributionId)) || "—"
+        })).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+        openQuantityDetailsModal("Total Quantity Not Yet Used", rows, "Quantity not yet used");
+    } catch (error) {
+        showToast(error.message, "danger");
+    }
+}
+
+async function openDisposedQuantityModal() {
+    try {
+        const [utilization, distributions] = await Promise.all([api.get("/utilization"), api.get("/distributions")]);
+        const dates = new Map((distributions || []).map(distribution => [Number(distribution.distributionId), distribution.distributionDate]));
+        const rows = (utilization || []).filter(row => Number(row.quantityDisposed || 0) > 0).map(row => ({
+            item: row.itemName || "—",
+            category: row.categoryName || "—",
+            quantity: row.quantityDisposed,
+            unit: row.unit || "—",
+            date: dates.get(Number(row.distributionId)) || "—"
+        })).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+        openQuantityDetailsModal("Total Quantity Disposed", rows, "Quantity disposed");
+    } catch (error) {
+        showToast(error.message, "danger");
+    }
+}
+
+function openFarmerListModal(title, rows) {
+    document.getElementById("farmerListModalHost")?.remove();
+    const host = document.createElement("div");
+    host.id = "farmerListModalHost";
+    host.innerHTML = `<div class="modal fade" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-centered"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">${escapeHtml(title)}</h5><button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body"><div class="table-responsive"><table class="table align-middle"><thead><tr><th class="tl">Last Name</th><th class="tl">First Name</th><th class="tl">Middle Name</th><th class="tl">Barangay</th><th class="tl">Municipality</th><th class="tl">Province</th></tr></thead><tbody>
+            ${rows.length ? rows.map(row => `<tr><td class="tl">${escapeHtml(row.lastName)}</td><td class="tl">${escapeHtml(row.firstName)}</td><td class="tl">${escapeHtml(row.middleName)}</td><td class="tl col-text-wrap">${escapeHtml(row.barangay)}</td><td class="tl col-text-wrap">${escapeHtml(row.municipality)}</td><td class="tl col-text-wrap">${escapeHtml(row.province)}</td></tr>`).join("") : `<tr><td colspan="6" class="empty-state">No farmers found.</td></tr>`}
+        </tbody></table></div></div>
+        <div class="modal-footer"><button class="btn btn-light" type="button" data-bs-dismiss="modal">Close</button></div>
+    </div></div></div>`;
+    document.body.appendChild(host);
+    const modal = new bootstrap.Modal(host.querySelector(".modal"));
+    modal.show();
+    host.querySelector(".modal").addEventListener("hidden.bs.modal", () => host.remove());
+}
+
+async function openNotReceivedFarmersModal() {
+    try {
+        const [farmers, distributions, seasonInfo] = await Promise.all([api.get("/farmers"), api.get("/distributions"), api.get("/monitoring-season")]);
+        const startedAt = seasonInfo?.startedAtUtc ? new Date(seasonInfo.startedAtUtc).getTime() : null;
+        const inSeason = row => !startedAt || parseApiDate(row.createdAtUtc) >= startedAt;
+        const received = new Set((distributions || [])
+            .filter(row => row.status === "Distributed" && inSeason(row))
+            .map(row => Number(row.farmerId)));
+        const rows = (farmers || []).filter(farmer => !received.has(Number(farmer.farmerId))).map(farmer => ({
+            lastName: farmer.lastName || "—",
+            firstName: farmer.firstName || "—",
+            middleName: farmer.middleName || "—",
+            barangay: farmer.barangay || "—",
+            municipality: farmer.municipality || "—",
+            province: farmer.province || "—"
+        })).sort((a, b) => String(a.lastName).localeCompare(String(b.lastName)) || String(a.firstName).localeCompare(String(b.firstName)));
+        openFarmerListModal("Farmers Not Yet Received Assistance", rows);
+    } catch (error) {
+        showToast(error.message, "danger");
+    }
+}
+
+function distributedPercentage(distributed, supplies) {
+    const remaining = (supplies || []).reduce((sum, supply) => sum + Number(supply.stockQuantity || 0), 0);
+    const total = Number(distributed || 0) + remaining;
+    return total > 0 ? (Number(distributed || 0) / total) * 100 : 0;
+}
+
 async function renderRiseDashboard() {
-    mainContent.innerHTML = `<div class="view-header"><div><p class="eyebrow">RICE FARMER ASSISTANCE</p><h2>System overview</h2><p>Live totals from farmer, distribution and utilization records.</p></div></div><div class="content-panel p-5">Loading dashboard data…</div>`;
+    mainContent.innerHTML = `<div class="view-header"><div><p class="eyebrow">RICE FARMER ASSISTANCE</p><h2>Dashboard</h2><p>Live totals from farmer, distribution and utilization records.</p></div></div><div class="content-panel p-5">Loading dashboard data…</div>`;
     try {
         const d = await api.get("/reports/dashboard");
-        riseCharts.forEach(c => c.destroy()); riseCharts = [];
-        const cards = [["Registered farmers",d.totalFarmers],["Farmers received assistance",d.receivedFarmers],
-            ["Not yet received",d.notReceivedFarmers],["Quantity distributed",d.totalDistributed],
-            ["Quantity used",d.quantityUsed],["Still stocked",d.quantityStillStocked],
-            ["Not yet used",d.quantityNotYetUsed],["Disposed",d.quantityDisposed],["Unreported quantity",d.quantityUnreported]];
-        mainContent.innerHTML = `<div class="view-header"><div><p class="eyebrow">RICE FARMER ASSISTANCE</p><h2>System overview</h2><p>Statistics update automatically from saved database records.</p></div></div>
-        <section class="stat-grid">${cards.map(x=>`<article class="stat-card glass-card"><div class="stat-card-top"><span>${escapeHtml(x[0])}</span></div><strong>${Number(x[1]||0).toLocaleString()}</strong></article>`).join("")}</section>
+        let seasonStartedAt = null;
+        let allDistributions = [];
+        try {
+            const seasonInfo = await api.get("/monitoring-season");
+            if (seasonInfo?.startedAtUtc) seasonStartedAt = new Date(seasonInfo.startedAtUtc).getTime();
+        } catch {}
+        try { allDistributions = await api.get("/distributions") || []; } catch {}
+        const inSeason = row => !seasonStartedAt || new Date(parseApiDate(row.createdAtUtc)) >= seasonStartedAt;
+        let seasonDistributed = allDistributions.filter(inSeason)
+            .reduce((sum, row) => sum + (row.items || []).reduce((itemSum, item) => itemSum + Number(item.quantity || 0), 0), 0);
+        const seasonDistributionIds = new Set(allDistributions.filter(inSeason).map(row => Number(row.distributionId)));
+        let toMonitorFarmers = 0, overdueFarmers = 0, seasonStocked = 0, seasonDisposed = 0, seasonUsed = 0, seasonNotUsed = 0, seasonUnreported = 0;
+        try {
+            const utilizationRows = await api.get("/utilization") || [];
+            const today = new Date().toISOString().slice(0, 10);
+            const seasonRows = utilizationRows.filter(row => seasonDistributionIds.has(Number(row.distributionId)));
+            toMonitorFarmers = new Set(seasonRows
+                .filter(row => row.utilizationMonitoringId === 0 || Number(row.unreportedQuantity) > 0)
+                .map(row => Number(row.farmerId))).size;
+            overdueFarmers = new Set(seasonRows
+                .filter(row => row.utilizationMonitoringId === 0 && row.targetMonitoringDate &&
+                    String(row.targetMonitoringDate) < today)
+                .map(row => Number(row.farmerId))).size;
+            seasonStocked = seasonRows.reduce((sum, row) => sum + Number(row.quantityStillStocked || 0), 0);
+            seasonDisposed = seasonRows.reduce((sum, row) => sum + Number(row.quantityDisposed || 0), 0);
+            seasonUsed = seasonRows.reduce((sum, row) => sum + Number(row.quantityUsed || 0), 0);
+            seasonNotUsed = seasonRows.reduce((sum, row) => sum + Number(row.quantityNotYetUsed || 0), 0);
+            seasonUnreported = seasonRows.reduce((sum, row) => sum + Number(row.unreportedQuantity || 0), 0);
+        } catch {}
+        const seasonTypeMap = new Map();
+        const seasonBarangayMap = new Map();
+        allDistributions.filter(inSeason).forEach(distribution => {
+            (distribution.items || []).forEach(item =>
+                seasonTypeMap.set(item.supplyName, (seasonTypeMap.get(item.supplyName) || 0) + Number(item.quantity || 0)));
+            seasonBarangayMap.set(distribution.barangay || "—", (seasonBarangayMap.get(distribution.barangay || "—") || 0) + 1);
+        });
+        const cards = [
+            { label: "Total registered farmers", value: d.totalFarmers, button: "View Farmers", action: "farmers" },
+            { label: "To Monitor", value: toMonitorFarmers, button: "Continue monitor", action: "utilization", badge: overdueFarmers ? `<i class="bi bi-exclamation-triangle me-1"></i>${overdueFarmers}` : "" },
+            { label: "Total Quantity distributed", value: seasonDistributed, button: "View details", action: "distributed" },
+            { label: "Total quantity used", value: seasonUsed, button: "View", action: "used" },
+            { label: "Still stocked", value: seasonStocked, button: "View supply", action: "supplies" },
+            { label: "Disposed", value: seasonDisposed, button: "View", action: "disposed" }
+        ];
+        mainContent.innerHTML = `<div class="view-header"><div><p class="eyebrow">RICE FARMER ASSISTANCE</p><h2>Dashboard</h2><p>Monitor your registered farms and farming activities.</p></div></div>
+        <section class="stat-grid">${cards.map(card=>`<article class="stat-card glass-card"><div class="stat-card-top"><span>${escapeHtml(card.label)}</span>${card.button?`<button class="stat-card-action" type="button" data-dashboard-card="${card.action}">${escapeHtml(card.button)}</button>`:""}</div><strong>${Number(card.value||0).toLocaleString()}</strong>${card.badge?`<span class="stat-card-badge" title="Overdue farmers">${card.badge}</span>`:""}</article>`).join("")}</section>
         <section class="dashboard-grid analytics-grid">
-          <article class="panel glass-panel"><div class="panel-header"><h3>Assistance status</h3></div><div class="chart-wrap"><canvas id="riseFarmersChart"></canvas></div></article>
+          <article class="panel glass-panel"><div class="panel-header"><h3>Assistance status</h3><button class="btn btn-sm btn-outline-success" type="button" id="viewNotReceivedBtn">View not yet received</button></div><div class="chart-wrap"><canvas id="riseFarmersChart"></canvas></div></article>
           <article class="panel glass-panel"><div class="panel-header"><h3>Distribution by assistance type</h3></div><div class="chart-wrap"><canvas id="riseTypeChart"></canvas></div></article>
           <article class="panel glass-panel"><div class="panel-header"><h3>Utilization by status</h3></div><div class="chart-wrap"><canvas id="riseUtilChart"></canvas></div></article>
           <article class="panel glass-panel"><div class="panel-header"><h3>Farmers assisted by barangay</h3></div><div class="chart-wrap"><canvas id="riseBarangayChart"></canvas></div></article>
         </section>`;
+        riseCharts.forEach(c => c.destroy()); riseCharts = [];
         const make=(id,type,labels,data)=>{const el=document.getElementById(id);if(el)riseCharts.push(new Chart(el,{type,data:{labels,datasets:[{label:"Count / quantity",data,borderWidth:1}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:type!=="bar"}}}}));};
-        make("riseFarmersChart","doughnut",d.farmersByStatus.map(x=>x.name),d.farmersByStatus.map(x=>x.count));
-        make("riseTypeChart","bar",d.distributionByType.map(x=>x.name),d.distributionByType.map(x=>x.quantity));
-        make("riseUtilChart","doughnut",d.utilizationByStatus.map(x=>x.name),d.utilizationByStatus.map(x=>x.quantity));
-        make("riseBarangayChart","bar",d.distributionByBarangay.map(x=>x.name),d.distributionByBarangay.map(x=>x.count));
+        const seasonReceivedIds = new Set(allDistributions.filter(row => inSeason(row)).map(row => Number(row.farmerId)));
+        make("riseFarmersChart","doughnut",["Received","Not yet received"],
+            [seasonReceivedIds.size, Math.max(0, Number(d.totalFarmers || 0) - seasonReceivedIds.size)]);
+        make("riseTypeChart","bar",[...seasonTypeMap.keys()],[...seasonTypeMap.values()]);
+        make("riseUtilChart","doughnut",["Used","Still stocked","Not yet used","Disposed","Unreported"],[seasonUsed,seasonStocked,seasonNotUsed,seasonDisposed,seasonUnreported]);
+        make("riseBarangayChart","bar",[...seasonBarangayMap.keys()],[...seasonBarangayMap.values()]);
+        document.getElementById("viewNotReceivedBtn")?.addEventListener("click", () => openNotReceivedFarmersModal());
+        mainContent.querySelectorAll("[data-dashboard-card]").forEach(button => button.addEventListener("click", () => {
+            const action = button.dataset.dashboardCard;
+            if (action === "distributed") openDistributedQuantityModal();
+            else if (action === "used") openUsedQuantityModal();
+            else if (action === "notused") openNotUsedQuantityModal();
+            else if (action === "disposed") openDisposedQuantityModal();
+            else if (action === "notreceived") openNotReceivedFarmersModal();
+            else setView(action);
+        }));
     } catch(error) {
         mainContent.innerHTML=`<div class="view-header"><div><h2>Dashboard</h2><p>Live database overview</p></div></div><div class="alert alert-danger">${escapeHtml(error.message)}</div>`;
     }
@@ -758,7 +967,9 @@ async function renderRiseDashboard() {
 let utilRows = [];
 let utilFarmers = [];
 let utilDistributionDates = new Map();
+let utilDistributionCreated = new Map();
 let utilTargetMonths = 3;
+let utilArchivedItemIds = new Set();
 let utilActiveTab = "to-monitor";
 const utilTabFilters = {
     "to-monitor": { search: "", barangay: "", year: "", status: "" },
@@ -855,14 +1066,17 @@ function openUtilizationFarmerModal(farmerId) {
             return rank(a) - rank(b) || dateB.localeCompare(dateA) || String(a.itemName).localeCompare(String(b.itemName));
         });
         itemHost.innerHTML = currentItems.length ? `<div class="table-responsive"><table class="table align-middle util-child-table">
-            <thead><tr><th class="tl">Distributed supply</th><th class="tc">Received${pendingOnly ? "" : "</th><th class=\"tc\">Used</th><th class=\"tc\">Stocked</th><th class=\"tc\">Disposed</th><th class=\"tc\">Monitored"}</th><th class="tc">Status</th><th class="tc">Actions</th></tr></thead>
+            <thead><tr><th class="tl">Distributed supply</th><th class="tc">Received</th>${pendingOnly ? `<th class="tc">Received date</th>` : `<th class="tc">Used</th><th class="tc">Stocked</th><th class="tc">Disposed</th><th class="tc">Monitored</th>`}<th class="tc">Status</th><th class="tc">Actions</th></tr></thead>
             <tbody>${currentItems.map(item => {
                 const itemStatus = utilizationItemStatus(item);
                 const targetInfo = monitoringTargetInfo(item);
+                const distributionDate = utilDistributionDates.get(Number(item.distributionId)) || "";
+                const receivedDate = distributionDate ? escapeHtml(new Date(`${distributionDate}T00:00:00`).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" })) : "—";
                 const targetNote = targetInfo ? `Target: ${escapeHtml(targetInfo.targetDate)} · ${targetInfo.days < 0 ? `${Math.abs(targetInfo.days)}d overdue` : `${targetInfo.days}d left`}${targetInfo.late ? " · monitored late" : ""}` : "";
                 return `<tr>
                     <td class="tl col-text-wrap">${escapeHtml(item.itemName)}${targetNote ? `<div class="small text-muted">${targetNote}</div>` : ""}</td>
                     <td class="tc">${escapeHtml(item.receivedQuantity)} ${escapeHtml(item.unit)}</td>
+                    ${pendingOnly ? `<td class="tc col-text-nowrap">${receivedDate}</td>` : ""}
 ${pendingOnly ? "" : `<td class="tc">${item.quantityUsed ?? "—"}</td>
                     <td class="tc">${item.quantityStillStocked ?? "—"}</td>
                     <td class="tc">${item.quantityDisposed ?? "—"}</td>
@@ -933,9 +1147,28 @@ async function renderUtilizationModule(errorMessage = "") {
     try {
         const distributions = await api.get("/distributions") || [];
         utilDistributionDates = new Map(distributions.map(d => [Number(d.distributionId), d.distributionDate]));
+        utilDistributionCreated = new Map(distributions.map(d => [Number(d.distributionId), d.createdAtUtc]));
     } catch {
         utilDistributionDates = new Map();
+        utilDistributionCreated = new Map();
     }
+
+    try {
+        const seasonInfo = await api.get("/monitoring-season");
+        if (seasonInfo?.startedAtUtc) {
+            const startedAt = new Date(seasonInfo.startedAtUtc).getTime();
+            utilRows = utilRows.filter(row => {
+                const created = utilDistributionCreated.get(Number(row.distributionId));
+                return !created || parseApiDate(created) >= startedAt;
+            });
+        } else if (seasonInfo?.startYear && seasonInfo?.startMonth) {
+            const seasonStart = new Date(seasonInfo.startYear, Number(seasonInfo.startMonth) - 1, 1);
+            utilRows = utilRows.filter(row => {
+                const date = utilDistributionDates.get(Number(row.distributionId));
+                return !date || new Date(`${date}T00:00:00`) >= seasonStart;
+            });
+        }
+    } catch {}
 
     try {
         const settings = await api.get("/utilization/settings");
@@ -1304,29 +1537,123 @@ async function openAddStockModal(supplyId) {
     host.querySelector(".modal").addEventListener("hidden.bs.modal", () => host.remove());
 }
 
+function seasonDateRange(seasonKey) {
+    const [year, kind] = String(seasonKey).split("-");
+    const y = Number(year);
+    if (!y) return null;
+    if (kind === "Wet") return [new Date(y, 5, 1), new Date(y, 10, 30)];
+    if (kind === "Dry") return [new Date(y - 1, 11, 1), new Date(y, 4, 31)];
+    return null;
+}
+
 async function renderRiseReports() {
-    const from=document.getElementById("riseReportFrom")?.value||"",to=document.getElementById("riseReportTo")?.value||"",barangay=document.getElementById("riseReportBarangay")?.value.trim()||"",type=document.getElementById("riseReportType")?.value.trim()||"",search=document.getElementById("riseReportSearch")?.value.trim().toLowerCase()||"";
+    const from=document.getElementById("riseReportFrom")?.value||"",to=document.getElementById("riseReportTo")?.value||"",barangay=document.getElementById("riseReportBarangay")?.value.trim()||"",type=document.getElementById("riseReportType")?.value.trim()||"",search=document.getElementById("riseReportSearch")?.value.trim().toLowerCase()||"",season=document.getElementById("riseReportSeason")?.value||"";
     let rows=[],stats=null,error="";
     try{const p=new URLSearchParams();if(from)p.set("from",from);if(to)p.set("to",to);if(barangay)p.set("barangay",barangay);if(type)p.set("assistanceType",type);[rows,stats]=await Promise.all([api.get(`/reports/summary${p.size?`?${p}`:""}`),api.get("/reports/dashboard")]);}catch(e){error=e.message;}
+    let activeSeason = "", pastSeasons = [], allSeasons = [], archivedRows = [], utilizationRows = [], seasonStartedAt = null, distCreated = new Map();
+    try {
+        const info = await api.get("/monitoring-season");
+        activeSeason = info?.activeSeason || "";
+        allSeasons = (info?.seasons || []).filter(Boolean);
+        if (info?.startedAtUtc) seasonStartedAt = new Date(info.startedAtUtc).getTime();
+        archivedRows = await api.get("/monitoring-season/history") || [];
+        pastSeasons = [...new Set([...archivedRows.map(row => row.seasonKey), ...allSeasons].filter(value => value && value !== activeSeason))].sort();
+        if (!allSeasons.length) allSeasons = [activeSeason, ...pastSeasons];
+    } catch {}
+    const allRows = [...rows];
+    if (!season && seasonStartedAt) {
+        try {
+            const distributions = await api.get("/distributions") || [];
+            distCreated = new Map(distributions.map(row => [Number(row.distributionId), row.createdAtUtc]));
+            rows = rows.filter(row => {
+                const created = distCreated.get(Number(row.distributionId));
+                return !created || parseApiDate(created) >= seasonStartedAt;
+            });
+        } catch {}
+    } else if (season) {
+        const range = seasonDateRange(season);
+        if (range) rows = rows.filter(row => {
+            const date = new Date(`${row.distributionDate}T00:00:00`);
+            return date >= range[0] && date <= range[1];
+        });
+    }
+    const effectiveSeason = season || activeSeason;
+    let reportToMonitor = 0;
+    try {
+        const [uRows, distributions] = await Promise.all([api.get("/utilization"), api.get("/distributions")]);
+        utilizationRows = uRows || [];
+        const dates = new Map((distributions || []).map(row => [Number(row.distributionId), row.distributionDate]));
+        const range = season ? seasonDateRange(effectiveSeason) : null;
+        reportToMonitor = new Set((utilizationRows || [])
+            .filter(row => {
+                const created = distCreated.get(Number(row.distributionId));
+                const date = dates.get(Number(row.distributionId));
+                const inSeason = range
+                    ? (date && new Date(`${date}T00:00:00`) >= range[0] && new Date(`${date}T00:00:00`) <= range[1])
+                    : (!seasonStartedAt || (created && parseApiDate(created) >= seasonStartedAt));
+                return inSeason && (row.utilizationMonitoringId === 0 || Number(row.unreportedQuantity) > 0);
+            })
+            .map(row => Number(row.farmerId))).size;
+    } catch {}
     const filtered=rows.filter(r=>!search||[r.farmer,r.item,r.barangay,r.distributionId].some(x=>String(x??"").toLowerCase().includes(search)));
     const aggregate=(key)=>{const map=new Map();filtered.forEach(r=>{const k=r[key]||"Unspecified";const v=map.get(k)||{name:k,records:0,quantity:0};v.records++;v.quantity+=Number(r.quantity||0);map.set(k,v);});return [...map.values()].sort((a,b)=>String(a.name).localeCompare(String(b.name),undefined,{sensitivity:"base"}));};
     const byType=aggregate("item"), byBarangay=aggregate("barangay");
-    mainContent.innerHTML=`<div class="view-header"><div><h2>Reports and Analytics</h2><p>Assistance distribution and utilization totals from the database.</p></div><button class="btn btn-outline-success" id="printRiseReport"><i class="bi bi-printer me-1"></i> Print / Save PDF</button></div>
+    const usedMonthly=new Map();
+    filtered.forEach(row=>{const month=String(row.distributionDate||"").slice(0,7);if(month)usedMonthly.set(month,(usedMonthly.get(month)||0)+Number(row.used||0));});
+    const usedMonths=[...usedMonthly.keys()].sort();
+    const usedByCategory=new Map();
+    rows.forEach(row=>{
+        const name=String(row.item||"");
+        const category=/seed/i.test(name)?"Seeds":(/fertil|urea|14-14-14|14x14|npk|ammonium/i.test(name)?"Fertilizer":"Other");
+        usedByCategory.set(category,(usedByCategory.get(category)||0)+Number(row.used||0));
+    });
+    const categoryLabels=[...usedByCategory.keys()].sort();
+    const seasonOrder = [...new Set([...allSeasons, activeSeason].filter(Boolean))].sort((a, b) => {
+        const [ya, sa] = String(a).split("-"), [yb, sb] = String(b).split("-");
+        return Number(ya) - Number(yb) || String(sa).localeCompare(String(sb));
+    });
+    const seasonUsed = new Map();
+    seasonUsed.set(activeSeason, utilizationRows.filter(row => {
+        const created = distCreated.get(Number(row.distributionId));
+        return !seasonStartedAt || (created && parseApiDate(created) >= seasonStartedAt);
+    }).reduce((sum, row) => sum + Number(row.quantityUsed || 0), 0));
+    pastSeasons.forEach(key => seasonUsed.set(key, archivedRows
+        .filter(row => row.seasonKey === key).reduce((sum, row) => sum + Number(row.quantityUsed || 0), 0)));
+    const lineLabels = seasonOrder.map(key => formatSeasonLabel(key));
+    const lineValues = seasonOrder.map(key => seasonUsed.get(key) || 0);
+    const reportCards = [
+        { label: "Total registered farmers", value: stats?.totalFarmers, button: "View Farmers", action: "farmers" },
+        { label: "To Monitor", value: reportToMonitor, button: "Continue monitor", action: "utilization" },
+        { label: "Total Quantity distributed", value: rows.reduce((sum, row) => sum + Number(row.quantity || 0), 0), button: "View details", action: "distributed" },
+        { label: "Total quantity used", value: rows.reduce((sum, row) => sum + Number(row.used || 0), 0), button: "View", action: "used" },
+        { label: "Still stocked", value: rows.reduce((sum, row) => sum + Number(row.stocked || 0), 0), button: "View supply", action: "supplies" },
+        { label: "Disposed", value: rows.reduce((sum, row) => sum + Number(row.disposed || 0), 0), button: "View", action: "disposed" }
+    ];
+    mainContent.innerHTML=`<div class="view-header"><div><h2>Reports and Analytics</h2><p>Gain insights into farm operations, supply distribution, and harvest performance through organized reports and data-driven analytics</p></div><div class="d-flex gap-2 align-items-center"><select id="riseReportSeason" class="form-select" style="width:auto;min-width:170px"><option value="">Present</option>${pastSeasons.map(value=>`<option value="${escapeHtml(value)}"${value===season?" selected":""}>${escapeHtml(formatSeasonLabel(value))}</option>`).join("")}</select><button class="btn btn-outline-success" id="printRiseReport"><i class="bi bi-printer me-1"></i> Print / Save PDF</button></div></div>
     ${error?`<div class="alert alert-danger">${escapeHtml(error)}</div>`:""}
-    ${stats?`<section class="stat-grid">${[["Registered farmers",stats.totalFarmers],["Received assistance",stats.receivedFarmers],["Not yet received",stats.notReceivedFarmers],["Distributed quantity",stats.totalDistributed],["Used",stats.quantityUsed],["Still stocked",stats.quantityStillStocked],["Not yet used",stats.quantityNotYetUsed],["Disposed",stats.quantityDisposed],["Unreported",stats.quantityUnreported]].map(x=>`<article class="stat-card glass-card"><div class="stat-card-top"><span>${x[0]}</span></div><strong>${Number(x[1]||0).toLocaleString()}</strong></article>`).join("")}</section>`:""}
+    ${stats?`<section class="stat-grid">${reportCards.map(card=>`<article class="stat-card glass-card"><div class="stat-card-top"><span>${escapeHtml(card.label)}</span>${card.button?`<button class="stat-card-action" type="button" data-dashboard-card="${card.action}">${escapeHtml(card.button)}</button>`:""}</div><strong>${Number(card.value||0).toLocaleString()}</strong></article>`).join("")}</section>`:""}
+    <section class="dashboard-grid analytics-grid">
+      <article class="panel glass-panel"><div class="panel-header"><h3>Supply Utilization Trends</h3></div><div class="chart-wrap"><canvas id="reportUsedLineChart"></canvas></div></article>
+      <article class="panel glass-panel"><div class="panel-header"><h3>Used items by category</h3></div><div class="chart-wrap"><canvas id="reportUsedCategoryChart"></canvas></div></article>
+    </section>
     <section class="dashboard-grid analytics-grid">
       <article class="panel glass-panel"><div class="panel-header"><h3>Distribution by assistance type</h3></div><div class="table-responsive"><table class="table reports-type-table"><thead><tr><th class="tl">Assistance type</th><th class="tc">Records</th><th class="tc">Total quantity</th></tr></thead><tbody>${byType.length?byType.map(x=>`<tr><td class="tl">${escapeHtml(x.name)}</td><td class="tc">${x.records}</td><td class="tc">${x.quantity.toLocaleString()}</td></tr>`).join(""):`<tr><td colspan="3" class="empty-state">No records</td></tr>`}</tbody></table></div></article>
       <article class="panel glass-panel"><div class="panel-header"><h3>Distribution by barangay</h3></div><div class="table-responsive"><table class="table reports-barangay-table"><thead><tr><th class="tl">Barangay</th><th class="tc">Records</th><th class="tc">Total quantity</th></tr></thead><tbody>${byBarangay.length?byBarangay.map(x=>`<tr><td class="tl">${escapeHtml(x.name)}</td><td class="tc">${x.records}</td><td class="tc">${x.quantity.toLocaleString()}</td></tr>`).join(""):`<tr><td colspan="3" class="empty-state">No records</td></tr>`}</tbody></table></div></article>
-    </section>
-    <section class="content-panel"><form class="filter-bar" id="riseReportFilter">
-      <input id="riseReportFrom" class="form-control" type="date" value="${escapeHtml(from)}"><input id="riseReportTo" class="form-control" type="date" value="${escapeHtml(to)}">
-      <input id="riseReportBarangay" class="form-control" value="${escapeHtml(barangay)}" placeholder="Barangay"><input id="riseReportType" class="form-control" value="${escapeHtml(type)}" placeholder="Assistance type">
-      <input id="riseReportSearch" class="form-control" value="${escapeHtml(search)}" placeholder="Search farmer, item, barangay"><button class="btn btn-success">Apply filters</button>
-    </form><div class="table-responsive"><table class="table reports-main-table"><thead><tr><th class="tc">Date</th><th class="tl">Farmer</th><th class="tl">Barangay</th><th class="tl">Assistance type</th><th class="tc">Distributed</th><th class="tc">Used</th><th class="tc">Stocked</th><th class="tc">Not yet used</th><th class="tc">Disposed</th></tr></thead><tbody>
-    ${filtered.length?filtered.map(r=>`<tr><td class="tc">${escapeHtml(r.distributionDate)}</td><td class="tl">${escapeHtml(r.farmer)}</td><td class="tl">${escapeHtml(r.barangay||"—")}</td><td class="tl">${escapeHtml(r.item)}</td><td class="tc">${r.quantity} ${escapeHtml(r.unit)}</td><td class="tc">${r.used??"—"}</td><td class="tc">${r.stocked??"—"}</td><td class="tc">${r.notYetUsed??"—"}</td><td class="tc">${r.disposed??"—"}</td></tr>`).join(""):`<tr><td colspan="9" class="empty-state">No matching assistance records.</td></tr>`}
-    </tbody></table></div></section>`;
-    document.getElementById("riseReportFilter")?.addEventListener("submit",e=>{e.preventDefault();renderRiseReports();});
+    </section>`;
+    reportCharts.forEach(chart=>chart.destroy()); reportCharts=[];
+    const lineEl=document.getElementById("reportUsedLineChart");
+    if(lineEl)reportCharts.push(new Chart(lineEl,{type:"line",data:{labels:lineLabels,datasets:[{label:"Quantity used",data:lineValues,borderColor:"#e5b33d",backgroundColor:"rgba(229,179,61,0.18)",pointBackgroundColor:"#e5b33d",tension:0.3,fill:true,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}}));
+    const barEl=document.getElementById("reportUsedCategoryChart");
+    if(barEl)reportCharts.push(new Chart(barEl,{type:"bar",data:{labels:categoryLabels,datasets:[{label:"Quantity used",data:categoryLabels.map(key=>usedByCategory.get(key)),backgroundColor:"rgba(114,168,86,0.65)",borderColor:"#72a856",borderWidth:1}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}}));
+    document.getElementById("riseReportSeason")?.addEventListener("change",()=>renderRiseReports());
     document.getElementById("printRiseReport")?.addEventListener("click",()=>window.print());
+    mainContent.querySelectorAll("[data-dashboard-card]").forEach(button => button.addEventListener("click", () => {
+        const action = button.dataset.dashboardCard;
+        if (action === "distributed") openDistributedQuantityModal();
+        else if (action === "used") openUsedQuantityModal();
+        else if (action === "disposed") openDisposedQuantityModal();
+        else setView(action);
+    }));
 }
 
 function bindDynamicActions() {
@@ -1418,25 +1745,208 @@ document.querySelectorAll(".nav-item[data-view]").forEach(item => item.addEventL
 document.getElementById("globalSearch").addEventListener("keydown", event => {
     if (event.key === "Enter") { setView("farmers"); setTimeout(() => { document.getElementById("searchInput").value = event.currentTarget.value; loadFarmers(); }, 0); }
 });
+function parseApiDate(value) {
+    if (!value) return 0;
+    const text = String(value);
+    return new Date(/[zZ]|[+-]\d{2}:\d{2}$/.test(text) ? text : `${text}Z`).getTime();
+}
+
+function showSeasonCreatedDialog(season, monthName, year) {
+    document.getElementById("seasonConfirmHost")?.remove();
+    const host = document.createElement("div");
+    host.id = "seasonConfirmHost";
+    host.innerHTML = `<div class="modal fade" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content season-confirm season-confirm-success">
+        <div class="season-confirm-body">
+            <span class="season-confirm-icon"><i class="bi bi-check2"></i></span>
+            <p class="season-confirm-eyebrow">Season created</p>
+            <h5 class="season-confirm-title">Ready for a new monitoring cycle</h5>
+            <p class="season-confirm-text">The previous season's records were archived and remain viewable anytime.</p>
+            <div class="season-confirm-details">
+                <div><span>Season</span><strong>${escapeHtml(formatSeasonLabel(season))}</strong></div>
+                <div><span>Monitoring starts</span><strong>${escapeHtml(monthName)} ${escapeHtml(String(year))}</strong></div>
+            </div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-success" type="button" data-bs-dismiss="modal">Done</button></div>
+    </div></div></div>`;
+    document.body.appendChild(host);
+    const modal = new bootstrap.Modal(host.querySelector(".modal"));
+    modal.show();
+    host.querySelector(".modal").addEventListener("hidden.bs.modal", () => host.remove());
+}
+
+function confirmMarkSeasonDone(activeSeason, newSeason, onConfirm) {
+    document.getElementById("seasonConfirmAskHost")?.remove();
+    const host = document.createElement("div");
+    host.id = "seasonConfirmAskHost";
+    host.innerHTML = `<div class="modal fade" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content season-confirm season-confirm-ask">
+        <div class="season-confirm-body">
+            <span class="season-confirm-icon"><i class="bi bi-check2-square"></i></span>
+            <p class="season-confirm-eyebrow">Confirm action</p>
+            <h5 class="season-confirm-title">Mark present season as done?</h5>
+            <p class="season-confirm-text">The current season <strong>${escapeHtml(formatSeasonLabel(activeSeason) || "—")}</strong> will be marked done. Its monitoring records will be archived and stay viewable. After confirming, you can set up the new season.</p>
+        </div>
+        <div class="modal-footer"><button class="btn btn-light" type="button" id="seasonDoneNo">Cancel</button><button class="btn btn-success" type="button" id="seasonDoneYes">Yes, mark as done</button></div>
+    </div></div></div>`;
+    document.body.appendChild(host);
+    const modal = new bootstrap.Modal(host.querySelector(".modal"));
+    modal.show();
+    host.querySelector(".modal").addEventListener("hidden.bs.modal", () => host.remove());
+    document.getElementById("seasonDoneNo")?.addEventListener("click", () => modal.hide());
+    document.getElementById("seasonDoneYes")?.addEventListener("click", () => { modal.hide(); onConfirm(); });
+}
+
+async function openSeasonModal() {
+    let seasonInfo = null;
+    try { seasonInfo = await api.get("/monitoring-season"); } catch { seasonInfo = null; }
+    confirmMarkSeasonDone(seasonInfo?.activeSeason, "new season", () => showSeasonForm(seasonInfo));
+}
+
+function showSeasonForm(seasonInfo) {
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const currentYear = seasonInfo?.startYear || new Date().getFullYear();
+    const currentMonth = String(seasonInfo?.startMonth || new Date().getMonth() + 1).padStart(2, "0");
+    const monthOptions = monthNames.map((name, index) => `<option value="${String(index + 1).padStart(2, "0")}"${String(index + 1).padStart(2, "0") === currentMonth ? " selected" : ""}>${name}</option>`).join("");
+    document.getElementById("seasonModalHost")?.remove();
+    const host = document.createElement("div");
+    host.id = "seasonModalHost";
+    host.innerHTML = `<div class="modal fade" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form id="seasonForm">
+        <div class="modal-header"><h5 class="modal-title">Create new season</h5><button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body"><p class="text-muted small">Current season: <strong>${escapeHtml(seasonInfo?.activeSeason || "—")}</strong>. Creating a new season archives the current monitoring records and starts fresh. Previous data stays saved and viewable.</p>
+            <div class="row g-3">
+                <div class="col-md-6"><label class="form-label">Cropping season</label><select class="form-select" name="seasonType" required><option value="Wet">Wet season</option><option value="Dry">Dry season</option></select></div>
+                <div class="col-md-6"><label class="form-label">Year</label><input class="form-control" name="seasonYear" type="number" min="2000" max="2100" value="${currentYear}" required></div>
+                <div class="col-12"><label class="form-label">Start of monitoring (month)</label><select class="form-select" name="startMonth" required>${monthOptions}</select></div>
+            </div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-light" type="button" data-bs-dismiss="modal">Cancel</button><button class="btn btn-success" type="submit">Create season</button></div>
+    </form></div></div></div>`;
+    document.body.appendChild(host);
+    const modal = new bootstrap.Modal(host.querySelector(".modal"));
+    modal.show();
+    host.querySelector(".modal").addEventListener("hidden.bs.modal", () => host.remove());
+    host.querySelector("#seasonForm").addEventListener("submit", async event => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const season = `${form.elements.seasonYear.value}-${form.elements.seasonType.value}`;
+        try {
+            const month = Number(form.elements.startMonth.value);
+            const year = Number(form.elements.seasonYear.value);
+            const result = await api.put("/monitoring-season", {
+                season,
+                startMonth: month,
+                startYear: year
+            });
+            modal.hide();
+            showSeasonCreatedDialog(result?.activeSeason || season, monthNames[month - 1] || "", result?.startYear || year);
+            updateTopbarSeason();
+            renderRiseDashboard();
+        } catch (error) {
+            showToast(error.message, "danger");
+        }
+    });
+}
+
+function formatSeasonLabel(value) {
+    const [year, kind] = String(value || "").split("-");
+    return kind ? `${kind} season - ${year}` : value || "—";
+}
+
+function updateTopbarSeason() {
+    api.get("/monitoring-season").then(info => {
+        const el = document.getElementById("topbarSeason");
+        if (el && info?.activeSeason) {
+            el.innerHTML = `<i class="bi bi-calendar3 me-1"></i> ${escapeHtml(formatSeasonLabel(info.activeSeason))}`;
+            el.title = `Current season: ${formatSeasonLabel(info.activeSeason)}`;
+        }
+    }).catch(() => {});
+}
+
 function syncHeaderAddButton() {
     const button = document.getElementById("addRecordButton");
     const canAdd = currentView === "dashboard";
     button.hidden = !canAdd;
     if (!canAdd) return;
-    const label = currentView === "distribution" ? "New distribution" : currentView === "supplies" ? "Add supply" : "Register farmer";
+    const label = "Create new season";
     button.setAttribute("aria-label", label);
     button.title = label;
     button.querySelector(".d-none.d-md-inline").textContent = label;
 }
 
 async function openHeaderCreateForm() {
-    if (currentView === "dashboard" || currentView === "farmers") openCreateForm();
+    if (currentView === "dashboard") await openSeasonModal();
+    else if (currentView === "farmers") openCreateForm();
     else if (currentView === "distribution") await openDistributionModal("add");
     else if (currentView === "supplies") await openSupplyModal("add");
 }
 
 document.getElementById("addRecordButton").addEventListener("click", openHeaderCreateForm);
-document.getElementById("notificationButton").hidden = true;
+let notificationItems = [];
+async function updateNotificationBadge() {
+    try {
+        notificationItems = await api.get("/notifications") || [];
+        const count = notificationItems.filter(item => !item.isRead).length;
+        const el = document.getElementById("notificationCount");
+        if (el) {
+            el.textContent = String(count);
+            el.hidden = count === 0;
+        }
+    } catch {}
+}
+
+function toggleNotificationCard() {
+    document.getElementById("notificationCard")?.remove();
+    if (document.getElementById("notificationCardOpening")) return;
+    document.body.dataset.notificationCardOpening = "1";
+    if (!notificationItems.length) {
+        showToast("No notifications available.", "success");
+        delete document.body.dataset.notificationCardOpening;
+        return;
+    }
+    const card = document.createElement("div");
+    card.id = "notificationCard";
+    card.className = "notification-card";
+    card.innerHTML = `<div class="notification-card-header"><strong><i class="bi bi-bell me-2"></i>Notifications</strong><button class="btn btn-sm btn-outline-success" type="button" id="markAllNotificationsRead">Mark all read</button></div>
+        <div class="notification-card-list">${notificationItems.map(item => `<div class="notification-item${item.isRead ? "" : " unread"}" role="button" tabindex="0" data-notification-open="${item.notificationId}" data-notification-type="${escapeHtml(item.type)}" data-notification-title="${escapeHtml(item.title)}"><span class="notification-item-icon"><i class="bi ${item.type === "ImportantAlert" ? "bi-exclamation-triangle" : "bi-info-circle"}"></i></span><div class="notification-item-body"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.message)}</p><small>${escapeHtml(new Date(item.createdAtUtc).toLocaleString("en-PH", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }))}</small></div>${item.notificationId > 0 ? `<button class="btn btn-sm btn-light" type="button" data-notification-read="${item.notificationId}" title="Mark as read"><i class="bi bi-check2"></i></button>` : ""}</div>`).join("")}</div>
+        <div class="notification-card-footer"><a href="settings.html#notifications">Notification settings</a></div>`;
+    document.body.appendChild(card);
+    delete document.body.dataset.notificationCardOpening;
+    const close = event => {
+        if (!card.contains(event.target) && event.target.closest("#notificationButton") === null) {
+            card.remove();
+            document.removeEventListener("click", close);
+        }
+    };
+    setTimeout(() => document.addEventListener("click", close), 0);
+    card.querySelector("#markAllNotificationsRead")?.addEventListener("click", async () => {
+        try { await api.put("/notifications/read-all", {}); await updateNotificationBadge(); card.remove(); } catch (error) { showToast(error.message, "danger"); }
+    });
+    card.querySelectorAll("[data-notification-read]").forEach(button => button.addEventListener("click", async event => {
+        event.stopPropagation();
+        try { await api.put(`/notifications/${button.dataset.notificationRead}/read`, {}); await updateNotificationBadge(); toggleNotificationCard(); } catch (error) { showToast(error.message, "danger"); }
+    }));
+    card.querySelectorAll("[data-notification-open]").forEach(item => {
+        const open = async () => {
+            const id = Number(item.dataset.notificationOpen);
+            const title = item.dataset.notificationTitle || "";
+            const target = title.includes("Low stock") ? "supplies"
+                : title.includes("New season") ? "dashboard"
+                : title.includes("Overdue") || title.includes("Monitoring due") ? "utilization" : "reports";
+            if (id > 0) {
+                try { await api.put(`/notifications/${id}/read`, {}); await updateNotificationBadge(); } catch {}
+            }
+            card.remove();
+            setView(target);
+        };
+        item.addEventListener("click", open);
+        item.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); open(); } });
+    });
+}
+
+document.getElementById("notificationButton")?.addEventListener("click", event => {
+    event.stopPropagation();
+    toggleNotificationCard();
+});
+updateNotificationBadge();
 
 function updateSidebarToggleIcon(isCollapsed) {
     const btn = document.getElementById("mobileMenu");
@@ -1484,9 +1994,11 @@ document.getElementById("sidebarClose").addEventListener("click", () => {
 });
 document.getElementById("sidebarBackdrop").addEventListener("click", closeMobileNav);
 document.getElementById("sidebarCollapseBtn")?.addEventListener("click", toggleSidebar);
+document.getElementById("sidebarExpandBtn")?.addEventListener("click", toggleSidebar);
 
 initSidebarState();
 
 syncHeaderAddButton();
+updateTopbarSeason();
 renderRiseDashboard();
 document.getElementById("mainContent").classList.add("view-ready");

@@ -16,13 +16,16 @@ public sealed class DistributionsController : ControllerBase
 {
     private readonly RiseDbContext _context;
     private readonly ILogger<DistributionsController> _logger;
+    private readonly RISE.API.Services.NotificationService _notifications;
 
     public DistributionsController(
         RiseDbContext context,
-        ILogger<DistributionsController> logger)
+        ILogger<DistributionsController> logger,
+        RISE.API.Services.NotificationService notifications)
     {
         _context = context;
         _logger = logger;
+        _notifications = notifications;
     }
 
     [HttpGet]
@@ -375,6 +378,13 @@ public sealed class DistributionsController : ControllerBase
 
         await WriteAuditAsync(distribution, "Create+Receive", null, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        var lowStock = await _context.Supplies.AsNoTracking()
+            .Where(supply => request.Items.Select(item => item.SupplyId).Contains(supply.SupplyId) &&
+                supply.IsActive && supply.StockQuantity <= 10)
+            .Select(supply => supply.Name).ToListAsync(cancellationToken);
+        if (lowStock.Count > 0)
+            await _notifications.PublishAsync("ImportantAlert", "Low stock alert",
+                $"Stock is low after this distribution: {string.Join(", ", lowStock)}.", cancellationToken);
         var result = await GetDistribution(distribution.DistributionId, cancellationToken);
         return CreatedAtAction(
             nameof(GetDistribution),

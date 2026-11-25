@@ -20,6 +20,9 @@ public class RiseDbContext : DbContext
     public DbSet<Distribution> Distributions => Set<Distribution>();
     public DbSet<DistributionItem> DistributionItems => Set<DistributionItem>();
     public DbSet<UtilizationMonitoring> UtilizationMonitorings => Set<UtilizationMonitoring>();
+    public DbSet<UtilizationSeasonRecord> UtilizationSeasonRecords => Set<UtilizationSeasonRecord>();
+    public DbSet<AppSetting> AppSettings => Set<AppSetting>();
+    public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<PlantingRecord> PlantingRecords => Set<PlantingRecord>();
     public DbSet<CropMonitoringRecord> CropMonitoringRecords => Set<CropMonitoringRecord>();
     public DbSet<SupplyUsageRecord> SupplyUsageRecords => Set<SupplyUsageRecord>();
@@ -389,6 +392,34 @@ public class RiseDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(token => token.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<UtilizationSeasonRecord>(entity =>
+        {
+            entity.Property(record => record.SeasonKey).HasMaxLength(50).IsRequired();
+            entity.Property(record => record.QuantityUsed).HasPrecision(18, 3);
+            entity.Property(record => record.QuantityStillStocked).HasPrecision(18, 3);
+            entity.Property(record => record.QuantityNotYetUsed).HasPrecision(18, 3);
+            entity.Property(record => record.QuantityDisposed).HasPrecision(18, 3);
+            entity.HasIndex(record => new { record.SeasonKey, record.DistributionItemId });
+            entity.HasOne(record => record.DistributionItem).WithMany()
+                .HasForeignKey(record => record.DistributionItemId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<AppSetting>(entity =>
+        {
+            entity.HasIndex(setting => setting.Key).IsUnique();
+            entity.HasData(new AppSetting { AppSettingId = 1, Key = "ActiveSeason", Value = "2026-Wet" });
+        });
+
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.Property(item => item.Type).HasMaxLength(50).IsRequired();
+            entity.Property(item => item.Title).HasMaxLength(200).IsRequired();
+            entity.Property(item => item.Message).HasMaxLength(1000).IsRequired();
+            entity.HasIndex(item => new { item.UserId, item.IsRead, item.CreatedAtUtc });
+            entity.HasOne(item => item.User).WithMany()
+                .HasForeignKey(item => item.UserId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

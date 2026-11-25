@@ -56,6 +56,7 @@ builder.Services.AddControllers();
 // Custom services
 builder.Services.AddScoped<IPasswordService, PasswordService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<RISE.API.Services.NotificationService>();
 
 // CORS Configuration
 builder.Services.AddCors(options =>

@@ -11,8 +11,6 @@ public class RiseDbContext : DbContext
     }
 
     public DbSet<Farmer> Farmers => Set<Farmer>();
-    public DbSet<FarmerAssociation> FarmerAssociations => Set<FarmerAssociation>();
-    public DbSet<Farm> Farms => Set<Farm>();
     public DbSet<AssistanceProgram> AssistancePrograms => Set<AssistanceProgram>();
     public DbSet<Supply> Supplies => Set<Supply>();
     public DbSet<SupplyCategory> SupplyCategories => Set<SupplyCategory>();
@@ -47,7 +45,6 @@ public class RiseDbContext : DbContext
             entity.Property(farmer => farmer.MiddleName).HasMaxLength(60);
             entity.Property(farmer => farmer.Province).HasMaxLength(100);
             entity.Property(farmer => farmer.ContactNumber).HasMaxLength(30);
-            entity.Property(farmer => farmer.Address).HasMaxLength(300);
             entity.Property(farmer => farmer.Barangay).HasMaxLength(100);
             entity.Property(farmer => farmer.Municipality).HasMaxLength(100);
             entity.Property(farmer => farmer.IsActive).HasDefaultValue(true);
@@ -59,35 +56,6 @@ public class RiseDbContext : DbContext
                 .HasFilter("[IsActive] = 1");
             entity.HasIndex(farmer => farmer.Barangay);
             entity.HasIndex(farmer => farmer.Municipality);
-            entity.HasIndex(farmer => farmer.FarmerAssociationId);
-
-            entity.HasOne(farmer => farmer.Association)
-                .WithMany(association => association.Farmers)
-                .HasForeignKey(farmer => farmer.FarmerAssociationId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        modelBuilder.Entity<FarmerAssociation>(entity =>
-        {
-            entity.Property(association => association.Name)
-                .HasMaxLength(150)
-                .IsRequired();
-            entity.HasIndex(association => association.Name).IsUnique();
-        });
-
-        modelBuilder.Entity<Farm>(entity =>
-        {
-            entity.Property(farm => farm.Name).HasMaxLength(150).IsRequired();
-            entity.Property(farm => farm.Barangay).HasMaxLength(100).IsRequired();
-            entity.Property(farm => farm.Municipality).HasMaxLength(100).IsRequired();
-            entity.Property(farm => farm.AreaHectares).HasPrecision(12, 4);
-            entity.Property(farm => farm.SoilType).HasMaxLength(100);
-            entity.Property(farm => farm.IsActive).HasDefaultValue(true);
-            entity.HasIndex(farm => farm.FarmerId);
-            entity.ToTable(table => table.HasCheckConstraint(
-                "CK_Farms_AreaHectares_Positive", "[AreaHectares] > 0"));
-            entity.HasOne(farm => farm.Farmer).WithMany(farmer => farmer.Farms)
-                .HasForeignKey(farm => farm.FarmerId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<AssistanceProgram>(entity =>
@@ -125,7 +93,6 @@ public class RiseDbContext : DbContext
             entity.Property(supply => supply.UnitCost).HasPrecision(18, 2);
             entity.Property(supply => supply.StockQuantity).HasPrecision(18, 3);
             entity.Property(supply => supply.IsActive).HasDefaultValue(true);
-            entity.Property(supply => supply.Description).HasMaxLength(500);
             entity.HasIndex(supply => supply.SupplyCategoryId);
             entity.ToTable(table =>
             {
@@ -205,7 +172,6 @@ public class RiseDbContext : DbContext
             entity.Property(record => record.Season).HasMaxLength(50);
             entity.Property(record => record.AreaPlantedHectares).HasPrecision(12, 4);
             entity.Property(record => record.Status).HasMaxLength(20).HasDefaultValue("Growing");
-            entity.HasIndex(record => record.FarmId);
             entity.HasIndex(record => record.PlantingDate);
             entity.HasIndex(record => record.SeedDistributionItemId);
             entity.ToTable(table =>
@@ -216,8 +182,6 @@ public class RiseDbContext : DbContext
                 table.HasCheckConstraint("CK_PlantingRecords_ExpectedHarvest",
                     "[ExpectedHarvestDate] IS NULL OR [ExpectedHarvestDate] >= [PlantingDate]");
             });
-            entity.HasOne(record => record.Farm).WithMany(farm => farm.PlantingRecords)
-                .HasForeignKey(record => record.FarmId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(record => record.SeedDistributionItem).WithMany(item => item.PlantingRecords)
                 .HasForeignKey(record => record.SeedDistributionItemId).OnDelete(DeleteBehavior.Restrict);
         });
@@ -353,7 +317,6 @@ public class RiseDbContext : DbContext
             entity.Property(document => document.Sha256).HasMaxLength(64);
             entity.Property(document => document.UploadedAtUtc).HasDefaultValueSql("SYSUTCDATETIME()");
             entity.HasIndex(document => document.FarmerId);
-            entity.HasIndex(document => document.FarmId);
             entity.HasIndex(document => document.DistributionId);
             entity.HasIndex(document => document.PlantingRecordId);
             entity.HasIndex(document => document.HarvestRecordId);
@@ -363,15 +326,12 @@ public class RiseDbContext : DbContext
                 table.HasCheckConstraint(
                     "CK_SupportingDocuments_OneParent",
                     "((CASE WHEN [FarmerId] IS NULL THEN 0 ELSE 1 END) + " +
-                    "(CASE WHEN [FarmId] IS NULL THEN 0 ELSE 1 END) + " +
                     "(CASE WHEN [DistributionId] IS NULL THEN 0 ELSE 1 END) + " +
                     "(CASE WHEN [PlantingRecordId] IS NULL THEN 0 ELSE 1 END) + " +
                     "(CASE WHEN [HarvestRecordId] IS NULL THEN 0 ELSE 1 END)) = 1");
             });
             entity.HasOne(document => document.Farmer).WithMany(farmer => farmer.SupportingDocuments)
                 .HasForeignKey(document => document.FarmerId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(document => document.Farm).WithMany(farm => farm.SupportingDocuments)
-                .HasForeignKey(document => document.FarmId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(document => document.Distribution).WithMany(distribution => distribution.SupportingDocuments)
                 .HasForeignKey(document => document.DistributionId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(document => document.PlantingRecord).WithMany(planting => planting.SupportingDocuments)

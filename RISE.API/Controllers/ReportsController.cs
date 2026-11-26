@@ -23,7 +23,7 @@ public sealed class ReportsController : ControllerBase
     {
         var totalFarmers = await _context.Farmers.CountAsync(f => f.IsActive, cancellationToken);
         var receivedFarmerIds = _context.Distributions
-            .Where(d => d.Status == "Distributed" && d.Farmer.IsActive)
+            .Where(d => d.Status == "Distributed" && d.Farmer.IsActive && d.Items.Any())
             .Select(d => d.FarmerId).Distinct();
         var receivedFarmers = await receivedFarmerIds.CountAsync(cancellationToken);
         var distributedItems = _context.DistributionItems
@@ -116,7 +116,9 @@ public sealed class ReportsController : ControllerBase
         if (!string.IsNullOrWhiteSpace(municipality))
         {
             query = query.Where(record =>
-                record.PlantingRecord.Farm.Municipality.Contains(municipality));
+                record.PlantingRecord!.SeedDistributionItem != null &&
+                record.PlantingRecord.SeedDistributionItem.Distribution!.Farmer!.Municipality != null &&
+                record.PlantingRecord.SeedDistributionItem.Distribution!.Farmer!.Municipality!.Contains(municipality));
         }
 
         var reportRows = await query
@@ -124,9 +126,9 @@ public sealed class ReportsController : ControllerBase
             {
                 Year = record.HarvestDate.Year,
                 Month = record.HarvestDate.Month,
-                Municipality = record.PlantingRecord.Farm.Municipality,
+                Municipality = record.PlantingRecord.SeedDistributionItem == null ? "" : record.PlantingRecord.SeedDistributionItem.Distribution.Farmer.Municipality ?? "",
                 CropName = record.PlantingRecord.CropName,
-                FarmerId = record.PlantingRecord.Farm.FarmerId,
+                FarmerId = record.PlantingRecord.SeedDistributionItem == null ? 0 : record.PlantingRecord.SeedDistributionItem.Distribution.FarmerId,
                 record.QuantityKilograms
             })
             .GroupBy(record => new
@@ -253,22 +255,19 @@ public sealed class ReportsController : ControllerBase
             })
             .ToListAsync(cancellationToken);
 
-        var result = rows.Select(row =>
-        {
-            var categories = string.Join(" ", row.Items.Select(item => item.Category).Where(name => name != null));
-            var supplyNames = string.Join(" ", row.Items.Select(item => item.Name));
-            return new DistributionScheduleDto(
+        var result = rows.SelectMany(row => row.Items.Select(item =>
+            new DistributionScheduleDto(
                 row.DistributionId,
                 row.FarmerName,
                 row.DistributionDate,
-                RISE.API.Services.DistributionScheduleHelper.ClassifyAssistanceType(categories, supplyNames),
+                RISE.API.Services.DistributionScheduleHelper.ClassifyAssistanceType(item.Category, item.Name),
+                item.Name,
                 RISE.API.Services.DistributionScheduleHelper.GetCroppingSeason(row.DistributionDate),
-                row.Items.Sum(item => item.Quantity),
-                new[] { row.FarmerId }.Distinct().Count(),
+                item.Quantity,
+                1,
                 row.Barangay ?? "—",
                 row.Status,
-                row.CreatedAtUtc);
-        }).ToList();
+                row.CreatedAtUtc))).ToList();
 
         if (!string.IsNullOrWhiteSpace(type))
             result = result.Where(row => string.Equals(row.AssistanceType, type, StringComparison.OrdinalIgnoreCase)).ToList();

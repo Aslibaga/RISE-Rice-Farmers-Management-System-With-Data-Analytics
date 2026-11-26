@@ -1,20 +1,5 @@
 namespace RISE.API.Models;
 
-public class Farm
-{
-    public int FarmId { get; set; }
-    public int FarmerId { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public string Barangay { get; set; } = string.Empty;
-    public string Municipality { get; set; } = string.Empty;
-    public decimal AreaHectares { get; set; }
-    public string? SoilType { get; set; }
-    public bool IsActive { get; set; } = true;
-    public Farmer Farmer { get; set; } = null!;
-    public ICollection<PlantingRecord> PlantingRecords { get; set; } = new List<PlantingRecord>();
-    public ICollection<SupportingDocument> SupportingDocuments { get; set; } = new List<SupportingDocument>();
-}
-
 public class AssistanceProgram
 {
     public int AssistanceProgramId { get; set; }
@@ -54,10 +39,8 @@ public class Supply
     public decimal UnitCost { get; set; }
     public decimal StockQuantity { get; set; }
     public bool IsActive { get; set; } = true;
-    public string? Description { get; set; }
     public DateTime? ExpirationDate { get; set; }
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
-    public DateTime? UpdatedAtUtc { get; set; }
     public SupplyCategory Category { get; set; } = null!;
     public ICollection<DistributionItem> DistributionItems { get; set; } = new List<DistributionItem>();
     public ICollection<SupplyUsageRecord> UsageRecords { get; set; } = new List<SupplyUsageRecord>();
@@ -100,7 +83,6 @@ public class DistributionItem
 public class PlantingRecord
 {
     public int PlantingRecordId { get; set; }
-    public int FarmId { get; set; }
     public int? SeedDistributionItemId { get; set; }
     public string CropName { get; set; } = "Rice";
     public string? Variety { get; set; }
@@ -109,7 +91,6 @@ public class PlantingRecord
     public decimal AreaPlantedHectares { get; set; }
     public DateOnly? ExpectedHarvestDate { get; set; }
     public string Status { get; set; } = "Growing";
-    public Farm Farm { get; set; } = null!;
     public DistributionItem? SeedDistributionItem { get; set; }
     public ICollection<CropMonitoringRecord> MonitoringRecords { get; set; } = new List<CropMonitoringRecord>();
     public ICollection<SupplyUsageRecord> SupplyUsageRecords { get; set; } = new List<SupplyUsageRecord>();
@@ -235,7 +216,6 @@ public class SupportingDocument
 {
     public int SupportingDocumentId { get; set; }
     public int? FarmerId { get; set; }
-    public int? FarmId { get; set; }
     public int? DistributionId { get; set; }
     public int? PlantingRecordId { get; set; }
     public int? HarvestRecordId { get; set; }
@@ -247,7 +227,6 @@ public class SupportingDocument
     public string? Sha256 { get; set; }
     public DateTime UploadedAtUtc { get; set; }
     public Farmer? Farmer { get; set; }
-    public Farm? Farm { get; set; }
     public Distribution? Distribution { get; set; }
     public PlantingRecord? PlantingRecord { get; set; }
     public HarvestRecord? HarvestRecord { get; set; }

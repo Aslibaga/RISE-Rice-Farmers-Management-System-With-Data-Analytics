@@ -16,7 +16,7 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261125190533_AddNotifications";
+    public override string LastMigrationId => "20261126134741_RemoveFarmerAddress";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -305,55 +305,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                     });
             });
 
-        modelBuilder.Entity("RISE.API.Models.Farm", b =>
-            {
-                var farmId = b.Property<int>("FarmId")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("int");
-
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(farmId);
-
-                b.Property<decimal>("AreaHectares")
-                    .HasPrecision(12, 4)
-                    .HasColumnType("decimal(12,4)");
-
-                b.Property<string>("Barangay")
-                    .IsRequired()
-                    .HasMaxLength(100)
-                    .HasColumnType("nvarchar(100)");
-
-                b.Property<int>("FarmerId")
-                    .HasColumnType("int");
-
-                b.Property<bool>("IsActive")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("bit")
-                    .HasDefaultValue(true);
-
-                b.Property<string>("Municipality")
-                    .IsRequired()
-                    .HasMaxLength(100)
-                    .HasColumnType("nvarchar(100)");
-
-                b.Property<string>("Name")
-                    .IsRequired()
-                    .HasMaxLength(150)
-                    .HasColumnType("nvarchar(150)");
-
-                b.Property<string>("SoilType")
-                    .HasMaxLength(100)
-                    .HasColumnType("nvarchar(100)");
-
-                b.HasKey("FarmId");
-
-                b.HasIndex("FarmerId");
-
-                b.ToTable("Farms", t =>
-                    {
-                        t.HasCheckConstraint("CK_Farms_AreaHectares_Positive", "[AreaHectares] > 0");
-                    });
-            });
-
         modelBuilder.Entity("RISE.API.Models.Farmer", b =>
             {
                 var farmerId = b.Property<int>("FarmerId")
@@ -361,11 +312,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("int");
 
                 SqlServerPropertyBuilderExtensions.UseIdentityColumn(farmerId);
-
-                b.Property<string>("Address")
-                    .IsRequired()
-                    .HasMaxLength(300)
-                    .HasColumnType("nvarchar(300)");
 
                 b.Property<string>("Barangay")
                     .HasMaxLength(100)
@@ -375,9 +321,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                     .IsRequired()
                     .HasMaxLength(30)
                     .HasColumnType("nvarchar(30)");
-
-                b.Property<int?>("FarmerAssociationId")
-                    .HasColumnType("int");
 
                 b.Property<string>("FirstName")
                     .HasMaxLength(60)
@@ -413,8 +356,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
 
                 b.HasIndex("Barangay");
 
-                b.HasIndex("FarmerAssociationId");
-
                 b.HasIndex("FullName");
 
                 b.HasIndex("IsActive");
@@ -426,27 +367,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                     .HasFilter("[IsActive] = 1");
 
                 b.ToTable("Farmers");
-            });
-
-        modelBuilder.Entity("RISE.API.Models.FarmerAssociation", b =>
-            {
-                var farmerAssociationId = b.Property<int>("FarmerAssociationId")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("int");
-
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(farmerAssociationId);
-
-                b.Property<string>("Name")
-                    .IsRequired()
-                    .HasMaxLength(150)
-                    .HasColumnType("nvarchar(150)");
-
-                b.HasKey("FarmerAssociationId");
-
-                b.HasIndex("Name")
-                    .IsUnique();
-
-                b.ToTable("FarmerAssociations");
             });
 
         modelBuilder.Entity("RISE.API.Models.HarvestRecord", b =>
@@ -639,9 +559,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                 b.Property<DateOnly?>("ExpectedHarvestDate")
                     .HasColumnType("date");
 
-                b.Property<int>("FarmId")
-                    .HasColumnType("int");
-
                 b.Property<DateOnly>("PlantingDate")
                     .HasColumnType("date");
 
@@ -664,8 +581,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("nvarchar(100)");
 
                 b.HasKey("PlantingRecordId");
-
-                b.HasIndex("FarmId");
 
                 b.HasIndex("PlantingDate");
 
@@ -756,10 +671,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                 b.Property<DateTime>("CreatedAtUtc")
                     .HasColumnType("datetime2");
 
-                b.Property<string>("Description")
-                    .HasMaxLength(500)
-                    .HasColumnType("nvarchar(500)");
-
                 b.Property<DateTime?>("ExpirationDate")
                     .HasColumnType("datetime2");
 
@@ -788,9 +699,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                     .IsRequired()
                     .HasMaxLength(30)
                     .HasColumnType("nvarchar(30)");
-
-                b.Property<DateTime?>("UpdatedAtUtc")
-                    .HasColumnType("datetime2");
 
                 b.HasKey("SupplyId");
 
@@ -892,9 +800,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                 b.Property<int?>("DistributionId")
                     .HasColumnType("int");
 
-                b.Property<int?>("FarmId")
-                    .HasColumnType("int");
-
                 b.Property<int?>("FarmerId")
                     .HasColumnType("int");
 
@@ -933,8 +838,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
 
                 b.HasIndex("DistributionId");
 
-                b.HasIndex("FarmId");
-
                 b.HasIndex("FarmerId");
 
                 b.HasIndex("HarvestRecordId");
@@ -947,7 +850,7 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                     {
                         t.HasCheckConstraint("CK_SupportingDocuments_FileSize_NonNegative", "[FileSizeBytes] >= 0");
 
-                        t.HasCheckConstraint("CK_SupportingDocuments_OneParent", "((CASE WHEN [FarmerId] IS NULL THEN 0 ELSE 1 END) + (CASE WHEN [FarmId] IS NULL THEN 0 ELSE 1 END) + (CASE WHEN [DistributionId] IS NULL THEN 0 ELSE 1 END) + (CASE WHEN [PlantingRecordId] IS NULL THEN 0 ELSE 1 END) + (CASE WHEN [HarvestRecordId] IS NULL THEN 0 ELSE 1 END)) = 1");
+                        t.HasCheckConstraint("CK_SupportingDocuments_OneParent", "((CASE WHEN [FarmerId] IS NULL THEN 0 ELSE 1 END) + (CASE WHEN [DistributionId] IS NULL THEN 0 ELSE 1 END) + (CASE WHEN [PlantingRecordId] IS NULL THEN 0 ELSE 1 END) + (CASE WHEN [HarvestRecordId] IS NULL THEN 0 ELSE 1 END)) = 1");
                     });
             });
 
@@ -1209,27 +1112,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                 b.Navigation("Supply");
             });
 
-        modelBuilder.Entity("RISE.API.Models.Farm", b =>
-            {
-                b.HasOne("RISE.API.Models.Farmer", "Farmer")
-                    .WithMany("Farms")
-                    .HasForeignKey("FarmerId")
-                    .OnDelete(DeleteBehavior.Restrict)
-                    .IsRequired();
-
-                b.Navigation("Farmer");
-            });
-
-        modelBuilder.Entity("RISE.API.Models.Farmer", b =>
-            {
-                b.HasOne("RISE.API.Models.FarmerAssociation", "Association")
-                    .WithMany("Farmers")
-                    .HasForeignKey("FarmerAssociationId")
-                    .OnDelete(DeleteBehavior.Restrict);
-
-                b.Navigation("Association");
-            });
-
         modelBuilder.Entity("RISE.API.Models.HarvestRecord", b =>
             {
                 b.HasOne("RISE.API.Models.PlantingRecord", "PlantingRecord")
@@ -1282,18 +1164,10 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
 
         modelBuilder.Entity("RISE.API.Models.PlantingRecord", b =>
             {
-                b.HasOne("RISE.API.Models.Farm", "Farm")
-                    .WithMany("PlantingRecords")
-                    .HasForeignKey("FarmId")
-                    .OnDelete(DeleteBehavior.Restrict)
-                    .IsRequired();
-
                 b.HasOne("RISE.API.Models.DistributionItem", "SeedDistributionItem")
                     .WithMany("PlantingRecords")
                     .HasForeignKey("SeedDistributionItemId")
                     .OnDelete(DeleteBehavior.Restrict);
-
-                b.Navigation("Farm");
 
                 b.Navigation("SeedDistributionItem");
             });
@@ -1349,11 +1223,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                     .HasForeignKey("DistributionId")
                     .OnDelete(DeleteBehavior.Restrict);
 
-                b.HasOne("RISE.API.Models.Farm", "Farm")
-                    .WithMany("SupportingDocuments")
-                    .HasForeignKey("FarmId")
-                    .OnDelete(DeleteBehavior.Restrict);
-
                 b.HasOne("RISE.API.Models.Farmer", "Farmer")
                     .WithMany("SupportingDocuments")
                     .HasForeignKey("FarmerId")
@@ -1375,8 +1244,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                     .OnDelete(DeleteBehavior.Restrict);
 
                 b.Navigation("Distribution");
-
-                b.Navigation("Farm");
 
                 b.Navigation("Farmer");
 
@@ -1449,25 +1316,11 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                 b.Navigation("UtilizationMonitoring");
             });
 
-        modelBuilder.Entity("RISE.API.Models.Farm", b =>
-            {
-                b.Navigation("PlantingRecords");
-
-                b.Navigation("SupportingDocuments");
-            });
-
         modelBuilder.Entity("RISE.API.Models.Farmer", b =>
             {
                 b.Navigation("Distributions");
 
-                b.Navigation("Farms");
-
                 b.Navigation("SupportingDocuments");
-            });
-
-        modelBuilder.Entity("RISE.API.Models.FarmerAssociation", b =>
-            {
-                b.Navigation("Farmers");
             });
 
         modelBuilder.Entity("RISE.API.Models.HarvestRecord", b =>

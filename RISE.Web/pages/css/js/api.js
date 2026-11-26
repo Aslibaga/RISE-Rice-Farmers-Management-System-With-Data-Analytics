@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost:5000/api";
+const API_BASE_URL = (window.RISE_API_BASE || "http://localhost:5000") + "/api";
 const FARMERS_ENDPOINT = "/farmers";
 const mainContent = document.getElementById("mainContent");
 const farmerModal = new bootstrap.Modal(document.getElementById("farmerModal"));
@@ -146,7 +146,7 @@ function renderFarmerView(errorMessage = "") {
     mainContent.innerHTML = `${printDocumentHeader("Farmer Records Report", "Registered rice farmers and their information")}
         <div class="view-header">
             <div><h2>Farmer Registry</h2><p>Register, search and maintain rice farmer information.</p></div>
-            <div class="d-flex gap-2"><button class="btn btn-back" type="button" data-action="print"><i class="bi bi-printer me-1"></i> Print</button><button class="btn btn-success" type="button" data-action="register"><i class="bi bi-plus-lg me-1"></i> Register farmer</button></div>
+            <div class="d-flex gap-2"><div class="dropdown"><button class="btn btn-outline-success dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-file-earmark-excel me-1"></i> Excel</button><ul class="dropdown-menu dropdown-menu-dark"><li><button class="dropdown-item" type="button" data-excel="farmers-export"><i class="bi bi-file-earmark-arrow-down me-2"></i>Export to Excel</button></li></ul></div><button class="btn btn-back" type="button" data-action="print"><i class="bi bi-printer me-1"></i> Print</button><button class="btn btn-success" type="button" data-action="register"><i class="bi bi-plus-lg me-1"></i> Register farmer</button></div>
         </div>
         ${errorMessage ? `<div class="alert alert-danger">${escapeHtml(errorMessage)}</div>` : ""}
         <section class="content-panel">
@@ -203,6 +203,37 @@ function renderFarmers(errorMessage = "") {
             </td>
         </tr>`).join("");
     body.querySelectorAll("[data-action]").forEach(button => button.addEventListener("click", handleDynamicAction));
+
+    window.RISEPrint?.setContext("farmers", () => ({
+        title: "Farmer Information Record",
+        subtitle: "Registered rice farmers and their information",
+        meta: [
+            { label: "Report type", value: "Farmer registry" }
+        ],
+        blocks: [{
+            title: "Farmer registration details",
+            columns: [
+                { key: "lastName", label: "Last name" },
+                { key: "firstName", label: "First name" },
+                { key: "middleName", label: "Middle name" },
+                { key: "contactNumber", label: "Contact number" },
+                { key: "barangay", label: "Barangay" },
+                { key: "municipality", label: "Municipality" },
+                { key: "province", label: "Province" },
+                { key: "status", label: "Status", align: "center" }
+            ],
+            rows: farmers.map(farmer => ({
+                lastName: farmer.lastName || farmer.fullName || "—",
+                firstName: farmer.firstName || "—",
+                middleName: farmer.middleName || "—",
+                contactNumber: farmer.contactNumber || "—",
+                barangay: farmer.barangay || "—",
+                municipality: farmer.municipality || "—",
+                province: farmer.province || "—",
+                status: farmer.isActive ? "Active" : "Archived"
+            }))
+        }]
+    }));
 }
 
 function distributionStatusMeta(status) {
@@ -248,14 +279,14 @@ async function renderDistributionModule(errorMessage = "") {
             <div id="distributionTableContainer" class="table-responsive">
                 <table class="table align-middle mb-0 farmers-table distribution-overview">
                     <colgroup>
-                        <col class="col-lastname"><col class="col-firstname"><col class="col-middlename"><col class="col-barangay"><col class="col-municipality"><col class="col-province"><col class="col-distributions"><col class="col-dist-date"><col class="col-status"><col class="col-actions"></colgroup>
+                        <col class="col-lastname"><col class="col-firstname"><col class="col-middlename"><col class="col-barangay"><col class="col-municipality"><col class="col-province"><col class="col-distributions"><col class="col-dist-date"><col class="col-actions"></colgroup>
                     <thead><tr>
                         <th class="tl">Last Name</th><th class="tl">First Name</th><th class="tl">Middle Name</th>
                         <th class="tl">Barangay</th><th class="tl">Municipality</th><th class="tl">Province</th>
                         <th class="tc">Distributions</th><th class="tc">Last Distribution</th>
-                        <th class="tc">Status</th><th class="tc">Actions</th>
+                        <th class="tc">Actions</th>
                     </tr></thead>
-                    <tbody id="distributionTableBody"><tr><td colspan="10" class="empty-state">Loading assistance distributions...</td></tr></tbody>
+                    <tbody id="distributionTableBody"><tr><td colspan="9" class="empty-state">Loading assistance distributions...</td></tr></tbody>
                 </table>
             </div>
         </section>`;
@@ -273,15 +304,14 @@ function renderDistributionRows(summaries, errorMessage) {
     const body = document.getElementById("distributionTableBody");
     if (!body) return;
     if (errorMessage) {
-        body.innerHTML = `<tr><td colspan="10" class="empty-state">${escapeHtml(errorMessage)}</td></tr>`;
+        body.innerHTML = `<tr><td colspan="9" class="empty-state">${escapeHtml(errorMessage)}</td></tr>`;
         return;
     }
     if (!summaries.length) {
-        body.innerHTML = `<tr><td colspan="10" class="empty-state"><i class="bi bi-inbox"></i>No matching assistance distributions</td></tr>`;
+        body.innerHTML = `<tr><td colspan="9" class="empty-state"><i class="bi bi-inbox"></i>No matching assistance distributions</td></tr>`;
         return;
     }
     body.innerHTML = summaries.map(summary => {
-        const meta = distributionStatusMeta(summary.status);
         const farmerId = Number(summary.farmerId || 0);
         return `<tr>
             <td class="tl">${escapeHtml(summary.lastName || "—")}</td>
@@ -292,7 +322,6 @@ function renderDistributionRows(summaries, errorMessage) {
             <td class="tl col-text-wrap">${escapeHtml(summary.province || "—")}</td>
             <td class="tc col-text-nowrap">${escapeHtml(summary.totalDistributions ?? 0)}</td>
             <td class="tc col-text-nowrap">${escapeHtml(summary.lastDistributionDate ?? "")}</td>
-            <td class="tc status-cell"><span class="distribution-status-badge ${meta.cssClass}"><span class="status-dot"></span>${escapeHtml(meta.label)}</span></td>
             <td class="tc action-buttons"><button class="dist-action-btn dist-btn-history" type="button" data-distribution-action="history" data-id="${farmerId}" title="View distribution history"><i class="bi bi-eye"></i> Distribution History</button></td>
         </tr>`;
     }).join("");
@@ -370,7 +399,8 @@ async function renderFarmerDistributionHistory(farmerId) {
     ];
 
     const historyState = { newestFirst: true, search: "", category: "" };
-    const categories = [...new Set(historyItems.map(item => item.categoryName).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    const categories = [...new Set(historyItems.map(item => item.categoryName).filter(Boolean))].sort(compareCategoriesLast);
+    let visibleHistoryRows = [];
 
     const renderHistoryRows = () => {
         const body = document.getElementById("farmerHistoryTableBody");
@@ -388,6 +418,7 @@ async function renderFarmerDistributionHistory(farmerId) {
             return [item.referenceNumber, item.supplyName, item.categoryName, item.unitOfMeasure, item.remarks]
                 .filter(Boolean).some(value => String(value).toLowerCase().includes(term));
         });
+        visibleHistoryRows = items;
         if (!items.length) {
             body.innerHTML = `<tr><td colspan="7" class="empty-state"><i class="bi bi-inbox"></i>No matching distribution history</td></tr>`;
             return;
@@ -422,7 +453,7 @@ async function renderFarmerDistributionHistory(farmerId) {
                 </div>
             </div>
             <div class="history-stat-grid">
-                ${stats.map(stat => `<article class="stat-card glass-card"><div class="stat-card-top"><span>${escapeHtml(stat.label)}</span></div><strong>${escapeHtml(stat.value)}</strong></article>`).join("")}
+                ${stats.map(stat => `<article class="stat-card stat-card-compact glass-card"><div class="stat-card-top"><span>${escapeHtml(stat.label)}</span></div><strong>${escapeHtml(stat.value)}</strong></article>`).join("")}
             </div>
             <form class="filter-bar" id="farmerHistoryFilter">
                 <input class="form-control" id="farmerHistorySearch" type="search" placeholder="Search supply or reference">
@@ -457,7 +488,38 @@ async function renderFarmerDistributionHistory(farmerId) {
         setView("distribution");
     };
     historyBackBtn?.addEventListener("click", goBackToDistributions);
-    document.getElementById("farmerHistoryPrint")?.addEventListener("click", () => window.print());
+    document.getElementById("farmerHistoryPrint")?.addEventListener("click", () => window.RISEPrint?.print("farmerHistory"));
+    window.RISEPrint?.setContext("farmerHistory", () => ({
+        title: "Supply Distribution Record",
+        subtitle: farmerName,
+        featured: farmerName,
+        featuredLabel: "Farmer",
+        meta: [
+            { label: "Farmer", value: farmerName },
+            { label: "Address", value: [farmer?.barangay || history?.barangay, farmer?.municipality || history?.municipality, farmer?.province || history?.province].filter(Boolean).join(", ") }
+        ],
+        blocks: [{
+            title: "Individual assistance transactions",
+            columns: [
+                { key: "date", label: "Distribution date" },
+                { key: "supply", label: "Supply item" },
+                { key: "category", label: "Category" },
+                { key: "quantity", label: "Quantity", align: "right" },
+                { key: "unit", label: "Unit", align: "center" }
+            ],
+            rows: visibleHistoryRows.map(item => ({
+                date: item.distributionDate || "—",
+                supply: item.supplyName || "—",
+                category: item.categoryName || "—",
+                quantity: Number(item.quantity || 0).toLocaleString(),
+                unit: item.unitOfMeasure || "—"
+            })),
+            totals: [
+                { value: `Total Items: ${visibleHistoryRows.length}`, colspan: 5 }
+            ]
+        }],
+        signatures: ["Prepared by", "Received by"]
+    }));
 
     historyFilter.addEventListener("submit", event => { event.preventDefault(); });
     historySortBtn?.addEventListener("click", () => {
@@ -494,10 +556,9 @@ async function openDistributionModal(mode, id) {
     const supplyCategory = supplyId => supplies.find(s => Number(s.supplyId) === Number(supplyId))?.categoryName || "";
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const monthOptions = monthNames.map((name, index) => `<option value="${String(index + 1).padStart(2, "0")}">${name}</option>`).join("");
-    const targetBase = new Date(`${record?.distributionDate || defaultDate}T00:00:00`);
-    targetBase.setMonth(targetBase.getMonth() + (utilTargetMonths || 3));
-    const defaultTargetMonth = String(targetBase.getMonth() + 1).padStart(2, "0");
-    const defaultTargetYear = targetBase.getFullYear();
+    const currentDate = new Date();
+    const defaultTargetMonth = String(currentDate.getMonth() + 1).padStart(2, "0");
+    const defaultTargetYear = currentDate.getFullYear();
     const supplySelect = selectedId => `<option value="">Select assistance item...</option>${supplies.map(supply => `<option value="${supply.supplyId}" data-unit="${escapeHtml(supply.unitOfMeasure)}" data-category="${escapeHtml(supply.categoryName)}" data-stock="${supply.stockQuantity}"${Number(selectedId) === Number(supply.supplyId) ? " selected" : ""}>${escapeHtml(`${supply.name} (${supply.unitOfMeasure})`)}</option>`).join("")}`;
 
     document.getElementById("recordModalHost")?.remove();
@@ -514,7 +575,7 @@ async function openDistributionModal(mode, id) {
                 <dt class="col-5">Notes</dt><dd class="col-7">${escapeHtml(record?.notes || "—")}</dd>
             </dl>
             <h3 class="h6 mt-4 mb-2">Assistance items</h3>
-            <div class="table-responsive"><table class="table distribution-items-table"><colgroup><col class="col-di-item"><col class="col-di-category"><col class="col-di-qty"><col class="col-di-unit"><col class="col-di-target"></colgroup><thead><tr><th>Assistance item</th><th>Category</th><th>Quantity</th><th>Unit</th><th>Target month/year</th></tr></thead><tbody>
+            <div class="table-responsive"><table class="table distribution-items-table"><colgroup><col class="col-di-item"><col class="col-di-category"><col class="col-di-qty"><col class="col-di-unit"><col class="col-di-target"></colgroup><thead><tr><th>Assistance item</th><th>Category</th><th>Quantity</th><th>Unit</th><th>Target monitoring date</th></tr></thead><tbody>
                 ${(record?.items || []).map(item => `<tr><td>${escapeHtml(item.supplyName || supplies.find(s => s.supplyId === item.supplyId)?.name || "—")}</td><td>${escapeHtml(supplyCategory(item.supplyId) || "—")}</td><td>${escapeHtml(item.quantity ?? 0)}</td><td>${escapeHtml(item.unitOfMeasure || "—")}</td><td>${escapeHtml(item.targetMonitoringDate || "—")}</td></tr>`).join("")}
             </tbody></table></div>
         </div>` : `
@@ -533,7 +594,7 @@ async function openDistributionModal(mode, id) {
             </div>
             <div class="col-md-6"><label class="form-label">Distribution date</label><input class="form-control" name="distributionDate" type="date" value="${escapeHtml(record?.distributionDate || defaultDate)}" required></div>
             <div class="col-12"><label class="form-label">Notes</label><textarea class="form-control" name="notes" rows="2">${escapeHtml(record?.notes || "")}</textarea></div>
-            <div class="col-12"><div class="d-flex justify-content-between align-items-center mb-2"><h3 class="h6 mb-0">Assistance items</h3><button class="btn btn-sm btn-outline-success" type="button" id="addDistributionItem">Add item</button></div><div class="table-responsive"><table class="table distribution-items-table"><colgroup><col class="col-di-item"><col class="col-di-category"><col class="col-di-qty"><col class="col-di-unit"><col class="col-di-target"><col class="col-di-remove"></colgroup><thead><tr><th>Assistance item</th><th>Category</th><th>Quantity / Available stock</th><th>Unit</th><th>Target month/year</th><th></th></tr></thead><tbody id="distributionItems"></tbody></table></div></div>
+            <div class="col-12"><div class="d-flex justify-content-between align-items-center mb-2"><h3 class="h6 mb-0">Assistance items</h3><button class="btn btn-sm btn-outline-success" type="button" id="addDistributionItem">Add item</button></div><div class="table-responsive"><table class="table distribution-items-table"><colgroup><col class="col-di-item"><col class="col-di-category"><col class="col-di-qty"><col class="col-di-unit"><col class="col-di-target"><col class="col-di-remove"></colgroup><thead><tr><th>Assistance item</th><th>Category</th><th>Quantity / Available stock</th><th>Unit</th><th>Target monitoring date</th><th></th></tr></thead><tbody id="distributionItems"></tbody></table></div></div>
         </div></div>`}
         <div class="modal-footer"><button class="btn btn-light" type="button" data-bs-dismiss="modal">Close</button>${readOnly ? "" : '<button class="btn btn-success" type="submit">Save Distribution</button>'}</div>
     </form></div></div></div>`;
@@ -752,7 +813,7 @@ function openQuantityDetailsModal(title, rows, quantityLabel) {
         group.items.add(row.item || "—");
         if (String(row.date || "") > String(group.date)) group.date = row.date;
     });
-    const summary = [...grouped.values()].sort((a, b) => String(a.category).localeCompare(String(b.category)));
+    const summary = [...grouped.values()].sort((a, b) => compareCategoriesLast(a.category, b.category));
     document.getElementById("quantityDetailsHost")?.remove();
     const host = document.createElement("div");
     host.id = "quantityDetailsHost";
@@ -789,55 +850,62 @@ async function openDistributedQuantityModal() {
     }
 }
 
+async function loadSeasonUtilizationRows() {
+    const [utilization, distributions, seasonInfo] = await Promise.all([
+        api.get("/utilization"), api.get("/distributions"), api.get("/monitoring-season").catch(() => null)
+    ]);
+    const startedAt = seasonInfo?.startedAtUtc ? new Date(seasonInfo.startedAtUtc).getTime() : null;
+    const created = new Map((distributions || []).map(row => [Number(row.distributionId), row.createdAtUtc]));
+    const dates = new Map((distributions || []).map(row => [Number(row.distributionId), row.distributionDate]));
+    return (utilization || []).filter(row => {
+        const value = created.get(Number(row.distributionId));
+        return !startedAt || (value && parseApiDate(value) >= startedAt);
+    }).map(row => ({
+        item: row.itemName || "—",
+        category: row.categoryName || "—",
+        unit: row.unit || "—",
+        date: dates.get(Number(row.distributionId)) || "—",
+        used: row.quantityUsed,
+        stocked: row.quantityStillStocked,
+        notUsed: row.quantityNotYetUsed,
+        disposed: row.quantityDisposed
+    })).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+}
+
 async function openUsedQuantityModal() {
     try {
-        const [utilization, distributions] = await Promise.all([api.get("/utilization"), api.get("/distributions")]);
-        const dates = new Map((distributions || []).map(distribution => [Number(distribution.distributionId), distribution.distributionDate]));
-        const rows = (utilization || []).filter(row => Number(row.quantityUsed || 0) > 0).map(row => ({
-            item: row.itemName || "—",
-            category: row.categoryName || "—",
-            quantity: row.quantityUsed,
-            unit: row.unit || "—",
-            date: dates.get(Number(row.distributionId)) || "—"
-        })).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+        const rows = (await loadSeasonUtilizationRows())
+            .filter(row => Number(row.used || 0) > 0)
+            .map(row => ({ item: row.item, category: row.category, quantity: row.used, unit: row.unit, date: row.date }));
         openQuantityDetailsModal("Total Quantity Used", rows, "Quantity used");
-    } catch (error) {
-        showToast(error.message, "danger");
-    }
+    } catch (error) { showToast(error.message, "danger"); }
+}
+
+async function openStockedQuantityModal() {
+    try {
+        const rows = (await loadSeasonUtilizationRows())
+            .filter(row => Number(row.stocked || 0) > 0)
+            .map(row => ({ item: row.item, category: row.category, quantity: row.stocked, unit: row.unit, date: row.date }));
+        openQuantityDetailsModal("Still Stocked", rows, "Quantity still stocked");
+    } catch (error) { showToast(error.message, "danger"); }
 }
 
 async function openNotUsedQuantityModal() {
     try {
-        const [utilization, distributions] = await Promise.all([api.get("/utilization"), api.get("/distributions")]);
-        const dates = new Map((distributions || []).map(distribution => [Number(distribution.distributionId), distribution.distributionDate]));
-        const rows = (utilization || []).filter(row => Number(row.quantityNotYetUsed || 0) > 0).map(row => ({
-            item: row.itemName || "—",
-            category: row.categoryName || "—",
-            quantity: row.quantityNotYetUsed,
-            unit: row.unit || "—",
-            date: dates.get(Number(row.distributionId)) || "—"
-        })).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+        const rows = (await loadSeasonUtilizationRows())
+            .filter(row => Number(row.notUsed || 0) > 0)
+            .map(row => ({ item: row.item, category: row.category, quantity: row.notUsed, unit: row.unit, date: row.date }));
         openQuantityDetailsModal("Total Quantity Not Yet Used", rows, "Quantity not yet used");
-    } catch (error) {
-        showToast(error.message, "danger");
-    }
+    } catch (error) { showToast(error.message, "danger"); }
 }
 
 async function openDisposedQuantityModal() {
     try {
-        const [utilization, distributions] = await Promise.all([api.get("/utilization"), api.get("/distributions")]);
-        const dates = new Map((distributions || []).map(distribution => [Number(distribution.distributionId), distribution.distributionDate]));
-        const rows = (utilization || []).filter(row => Number(row.quantityDisposed || 0) > 0).map(row => ({
-            item: row.itemName || "—",
-            category: row.categoryName || "—",
-            quantity: row.quantityDisposed,
-            unit: row.unit || "—",
-            date: dates.get(Number(row.distributionId)) || "—"
-        })).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+        const rows = (await loadSeasonUtilizationRows())
+            .filter(row => Number(row.disposed || 0) > 0)
+            .map(row => ({ item: row.item, category: row.category, quantity: row.disposed, unit: row.unit, date: row.date }));
         openQuantityDetailsModal("Total Quantity Disposed", rows, "Quantity disposed");
-    } catch (error) {
-        showToast(error.message, "danger");
-    }
+    } catch (error) { showToast(error.message, "danger"); }
 }
 
 function openFarmerListModal(title, rows) {
@@ -896,15 +964,22 @@ async function renderRiseDashboard() {
             if (seasonInfo?.startedAtUtc) seasonStartedAt = new Date(seasonInfo.startedAtUtc).getTime();
         } catch {}
         try { allDistributions = await api.get("/distributions") || []; } catch {}
+        let allSupplies = [];
+        try { allSupplies = await api.get("/supplies") || []; } catch {}
+        const supplyCategory = new Map(allSupplies.map(supply => [Number(supply.supplyId), supply.categoryName || classifyAssistance(supply.name)]));
         const inSeason = row => !seasonStartedAt || new Date(parseApiDate(row.createdAtUtc)) >= seasonStartedAt;
-        let seasonDistributed = allDistributions.filter(inSeason)
-            .reduce((sum, row) => sum + (row.items || []).reduce((itemSum, item) => itemSum + Number(item.quantity || 0), 0), 0);
+        const distributedByUnit = [];
+        allDistributions.filter(inSeason).forEach(distribution =>
+            (distribution.items || []).forEach(item => distributedByUnit.push([
+                supplyCategory.get(Number(item.supplyId)) || classifyAssistance(item.supplyName),
+                item.unitOfMeasure, item.quantity])));
+        const usedByUnit = [], stockedByUnit = [], disposedByUnit = [];
         const seasonDistributionIds = new Set(allDistributions.filter(inSeason).map(row => Number(row.distributionId)));
-        let toMonitorFarmers = 0, overdueFarmers = 0, seasonStocked = 0, seasonDisposed = 0, seasonUsed = 0, seasonNotUsed = 0, seasonUnreported = 0;
+        let toMonitorFarmers = 0, overdueFarmers = 0, seasonStocked = 0, seasonDisposed = 0, seasonUsed = 0, seasonNotUsed = 0, seasonUnreported = 0, seasonRows = [];
         try {
             const utilizationRows = await api.get("/utilization") || [];
             const today = new Date().toISOString().slice(0, 10);
-            const seasonRows = utilizationRows.filter(row => seasonDistributionIds.has(Number(row.distributionId)));
+            seasonRows = utilizationRows.filter(row => seasonDistributionIds.has(Number(row.distributionId)));
             toMonitorFarmers = new Set(seasonRows
                 .filter(row => row.utilizationMonitoringId === 0 || Number(row.unreportedQuantity) > 0)
                 .map(row => Number(row.farmerId))).size;
@@ -912,42 +987,55 @@ async function renderRiseDashboard() {
                 .filter(row => row.utilizationMonitoringId === 0 && row.targetMonitoringDate &&
                     String(row.targetMonitoringDate) < today)
                 .map(row => Number(row.farmerId))).size;
-            seasonStocked = seasonRows.reduce((sum, row) => sum + Number(row.quantityStillStocked || 0), 0);
-            seasonDisposed = seasonRows.reduce((sum, row) => sum + Number(row.quantityDisposed || 0), 0);
-            seasonUsed = seasonRows.reduce((sum, row) => sum + Number(row.quantityUsed || 0), 0);
+            seasonRows.forEach(row => {
+                stockedByUnit.push([row.categoryName || classifyAssistance(row.itemName), row.unit, row.quantityStillStocked]);
+                disposedByUnit.push([row.categoryName || classifyAssistance(row.itemName), row.unit, row.quantityDisposed]);
+                usedByUnit.push([row.categoryName || classifyAssistance(row.itemName), row.unit, row.quantityUsed]);
+                seasonStocked += Number(row.quantityStillStocked || 0);
+                seasonDisposed += Number(row.quantityDisposed || 0);
+                seasonUsed += Number(row.quantityUsed || 0);
+            });
             seasonNotUsed = seasonRows.reduce((sum, row) => sum + Number(row.quantityNotYetUsed || 0), 0);
             seasonUnreported = seasonRows.reduce((sum, row) => sum + Number(row.unreportedQuantity || 0), 0);
         } catch {}
         const seasonTypeMap = new Map();
         const seasonBarangayMap = new Map();
         allDistributions.filter(inSeason).forEach(distribution => {
-            (distribution.items || []).forEach(item =>
-                seasonTypeMap.set(item.supplyName, (seasonTypeMap.get(item.supplyName) || 0) + Number(item.quantity || 0)));
+            (distribution.items || []).forEach(item => {
+                const category = supplyCategory.get(Number(item.supplyId)) || classifyAssistance(item.supplyName);
+                const key = `${category} (${item.unitOfMeasure || "unit"})`;
+                seasonTypeMap.set(key, (seasonTypeMap.get(key) || 0) + Number(item.quantity || 0));
+            });
             seasonBarangayMap.set(distribution.barangay || "—", (seasonBarangayMap.get(distribution.barangay || "—") || 0) + 1);
         });
+        const cardIcons = ["bi-people", "bi-clipboard-check", "bi-box-seam", "bi-check2-circle", "bi-boxes", "bi-trash3"];
+        const quantityEntries = [...distributedByUnit, ...usedByUnit, ...stockedByUnit, ...disposedByUnit];
+        const quantityCategories = [...new Set(quantityEntries.map(entry => entry[0] || "Other"))].sort(compareCategoriesLast);
         const cards = [
-            { label: "Total registered farmers", value: d.totalFarmers, button: "View Farmers", action: "farmers" },
+            { label: "Total Farmers Beneficiaries", value: d.totalFarmers, button: "View Farmers", action: "farmers" },
             { label: "To Monitor", value: toMonitorFarmers, button: "Continue monitor", action: "utilization", badge: overdueFarmers ? `<i class="bi bi-exclamation-triangle me-1"></i>${overdueFarmers}` : "" },
-            { label: "Total Quantity distributed", value: seasonDistributed, button: "View details", action: "distributed" },
-            { label: "Total quantity used", value: seasonUsed, button: "View", action: "used" },
-            { label: "Still stocked", value: seasonStocked, button: "View supply", action: "supplies" },
-            { label: "Disposed", value: seasonDisposed, button: "View", action: "disposed" }
+            { label: "Total Quantity distributed", display: formatQuantityByUnit(distributedByUnit, quantityCategories), button: "View details", action: "distributed" },
+            { label: "Total quantity used", display: formatQuantityByUnit(usedByUnit, quantityCategories), button: "View", action: "used" },
+            { label: "Still stocked", display: formatQuantityByUnit(stockedByUnit, quantityCategories), button: "View supply", action: "supplies" },
+            { label: "Disposed", display: formatQuantityByUnit(disposedByUnit, quantityCategories), button: "View", action: "disposed" }
         ];
         mainContent.innerHTML = `<div class="view-header"><div><p class="eyebrow">RICE FARMER ASSISTANCE</p><h2>Dashboard</h2><p>Monitor your registered farms and farming activities.</p></div></div>
-        <section class="stat-grid">${cards.map(card=>`<article class="stat-card glass-card"><div class="stat-card-top"><span>${escapeHtml(card.label)}</span>${card.button?`<button class="stat-card-action" type="button" data-dashboard-card="${card.action}">${escapeHtml(card.button)}</button>`:""}</div><strong>${Number(card.value||0).toLocaleString()}</strong>${card.badge?`<span class="stat-card-badge" title="Overdue farmers">${card.badge}</span>`:""}</article>`).join("")}</section>
+        <section class="stat-grid card-duo">${cards.map((card, index) => `<article class="stat-card glass-card"><div class="stat-card-top"><span>${escapeHtml(card.label)}</span><span class="stat-card-icon" aria-hidden="true"><i class="bi ${cardIcons[index] || "bi-bar-chart"}"></i></span></div>${card.display ? `<div class="stat-card-value stat-card-value-detail">${card.display}</div>` : `<strong class="stat-card-value stat-card-number">${Number(card.value || 0).toLocaleString()}</strong>`}${card.button || card.badge ? `<div class="stat-card-foot">${card.badge ? `<span class="stat-card-badge" title="Overdue farmers">${card.badge}</span>` : ""}${card.button ? `<button class="stat-card-action" type="button" data-dashboard-card="${card.action}">${escapeHtml(card.button)}</button>` : ""}</div>` : ""}</article>`).join("")}</section>
         <section class="dashboard-grid analytics-grid">
           <article class="panel glass-panel"><div class="panel-header"><h3>Assistance status</h3><button class="btn btn-sm btn-outline-success" type="button" id="viewNotReceivedBtn">View not yet received</button></div><div class="chart-wrap"><canvas id="riseFarmersChart"></canvas></div></article>
           <article class="panel glass-panel"><div class="panel-header"><h3>Distribution by assistance type</h3></div><div class="chart-wrap"><canvas id="riseTypeChart"></canvas></div></article>
-          <article class="panel glass-panel"><div class="panel-header"><h3>Utilization by status</h3></div><div class="chart-wrap"><canvas id="riseUtilChart"></canvas></div></article>
           <article class="panel glass-panel"><div class="panel-header"><h3>Farmers assisted by barangay</h3></div><div class="chart-wrap"><canvas id="riseBarangayChart"></canvas></div></article>
         </section>`;
         riseCharts.forEach(c => c.destroy()); riseCharts = [];
-        const make=(id,type,labels,data)=>{const el=document.getElementById(id);if(el)riseCharts.push(new Chart(el,{type,data:{labels,datasets:[{label:"Count / quantity",data,borderWidth:1}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:type!=="bar"}}}}));};
-        const seasonReceivedIds = new Set(allDistributions.filter(row => inSeason(row)).map(row => Number(row.farmerId)));
+        const chartPalette = ["#2f7d55", "#e5b33d", "#6f9e7f", "#b9862f", "#4b6b57", "#9db9a2"];
+        const make=(id,type,labels,data)=>{const el=document.getElementById(id);if(!el)return;const colors=labels.map((_,i)=>chartPalette[i%chartPalette.length]);riseCharts.push(new Chart(el,{type,data:{labels,datasets:[{label:"Count / quantity",data,backgroundColor:type==="bar"?colors.map(color=>`${color}cc`):colors,borderColor:colors,borderWidth:1,borderRadius:type==="bar"?5:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:type!=="bar",position:"bottom",labels:{color:"#d7e2d8",boxWidth:10,padding:10,font:{size:11}}}}}}));};
+        const seasonReceivedIds = new Set(allDistributions
+            .filter(row => inSeason(row) && (row.items || []).length > 0)
+            .map(row => Number(row.farmerId)));
         make("riseFarmersChart","doughnut",["Received","Not yet received"],
             [seasonReceivedIds.size, Math.max(0, Number(d.totalFarmers || 0) - seasonReceivedIds.size)]);
-        make("riseTypeChart","bar",[...seasonTypeMap.keys()],[...seasonTypeMap.values()]);
-        make("riseUtilChart","doughnut",["Used","Still stocked","Not yet used","Disposed","Unreported"],[seasonUsed,seasonStocked,seasonNotUsed,seasonDisposed,seasonUnreported]);
+        const typeEntries = [...seasonTypeMap.entries()].sort((a, b) => compareCategoriesLast(a[0], b[0]));
+        make("riseTypeChart","bar",typeEntries.map(entry => entry[0]),typeEntries.map(entry => entry[1]));
         make("riseBarangayChart","bar",[...seasonBarangayMap.keys()],[...seasonBarangayMap.values()]);
         document.getElementById("viewNotReceivedBtn")?.addEventListener("click", () => openNotReceivedFarmersModal());
         mainContent.querySelectorAll("[data-dashboard-card]").forEach(button => button.addEventListener("click", () => {
@@ -972,8 +1060,8 @@ let utilTargetMonths = 3;
 let utilArchivedItemIds = new Set();
 let utilActiveTab = "to-monitor";
 const utilTabFilters = {
-    "to-monitor": { search: "", barangay: "", year: "", status: "" },
-    "monitored": { search: "", barangay: "", year: "", status: "" }
+    "to-monitor": { search: "", barangay: "", status: "" },
+    "monitored": { search: "", barangay: "", status: "" }
 };
 let refreshUtilFarmerModal = null;
 
@@ -1032,7 +1120,7 @@ function openUtilizationFarmerModal(farmerId) {
     const pendingOnly = utilActiveTab === "to-monitor";
     const needsMonitoring = row => row.utilizationMonitoringId === 0 || Number(row.unreportedQuantity) > 0;
     const farmerMeta = [farmer.barangay, farmer.municipality, farmer.contactNumber].filter(Boolean).map(value => escapeHtml(value)).join(" · ");
-    const itemCategories = [...new Set(items.map(item => item.categoryName).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    const itemCategories = [...new Set(items.map(item => item.categoryName).filter(Boolean))].sort(compareCategoriesLast);
     const itemYears = [...new Set(items.map(item => item.monitoringDate).filter(date => date && date !== "0001-01-01").map(date => String(date).slice(0, 4)))].sort().reverse();
     const monthOptions = [["01", "January"], ["02", "February"], ["03", "March"], ["04", "April"], ["05", "May"], ["06", "June"], ["07", "July"], ["08", "August"], ["09", "September"], ["10", "October"], ["11", "November"], ["12", "December"]].map(([value, label]) => `<option value="${value}">${label}</option>`).join("");
     const itemFilters = { month: "", year: "", category: "" };
@@ -1082,7 +1170,7 @@ ${pendingOnly ? "" : `<td class="tc">${item.quantityUsed ?? "—"}</td>
                     <td class="tc">${item.quantityDisposed ?? "—"}</td>
                     <td class="tc col-text-nowrap">${item.monitoringDate && item.monitoringDate !== "0001-01-01" ? escapeHtml(new Date(`${item.monitoringDate}T00:00:00`).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" })) : "—"}</td>`}
                     <td class="tc"><span class="util-status-badge ${itemStatus.cssClass}"><span class="status-dot"></span>${escapeHtml(itemStatus.label)}</span></td>
-                    <td class="tc"><button class="btn btn-sm btn-outline-success" type="button" data-util-edit="${item.distributionItemId}">${item.utilizationMonitoringId === 0 ? "Monitor" : "Update"}</button></td>
+                    <td class="tc action-buttons"><button class="btn btn-sm btn-outline-success" type="button" data-util-edit="${item.distributionItemId}">${item.utilizationMonitoringId === 0 ? "Monitor" : "Update"}</button>${pendingOnly ? `<button class="btn btn-sm btn-outline-danger" type="button" data-util-delete="${item.distributionItemId}" title="Delete this distribution item"><i class="bi bi-trash3"></i></button>` : ""}</td>
                 </tr>`;
             }).join("")}</tbody></table></div>` : `<div class="empty-state">${pendingOnly ? "All supplies for this farmer have been monitored. This farmer is now listed in the Monitored tab." : "No monitoring records for this farmer."}${pendingOnly ? `<div class="mt-3"><button class="btn btn-sm btn-outline-success" type="button" id="utilGoMonitoredBtn">View in Monitored</button></div>` : ""}</div>`;
         document.getElementById("utilGoMonitoredBtn")?.addEventListener("click", () => {
@@ -1093,6 +1181,18 @@ ${pendingOnly ? "" : `<td class="tc">${item.quantityUsed ?? "—"}</td>
         itemHost.querySelectorAll("[data-util-edit]").forEach(button => button.addEventListener("click", () => {
             const item = utilRows.find(row => row.distributionItemId === Number(button.dataset.utilEdit));
             if (item) openUtilizationForm(item, () => renderFarmerItems());
+        }));
+        itemHost.querySelectorAll("[data-util-delete]").forEach(button => button.addEventListener("click", async () => {
+            if (!window.confirm("Delete this distributed item? The stock will be restored and this line will be removed from history.")) return;
+            try {
+                await api.delete(`/distribution-items/${button.dataset.utilDelete}`);
+                showToast("Distribution item deleted and stock restored.");
+                utilRows = utilRows.filter(row => row.distributionItemId !== Number(button.dataset.utilDelete));
+                renderFarmerItems();
+                renderUtilizationModule();
+            } catch (error) {
+                showToast(error.message, "danger");
+            }
         }));
     };
 
@@ -1129,13 +1229,11 @@ ${pendingOnly ? "" : `<td class="tc">${item.quantityUsed ?? "—"}</td>
 }
 
 async function renderUtilizationModule(errorMessage = "") {
-    const filters = utilTabFilters[utilActiveTab] || (utilTabFilters[utilActiveTab] = { search: "", barangay: "", year: "", status: "" });
+    const filters = utilTabFilters[utilActiveTab] || (utilTabFilters[utilActiveTab] = { search: "", barangay: "", status: "" });
     const search = document.getElementById("utilSearch")?.value.trim() ?? filters.search;
     const status = document.getElementById("utilStatus")?.value ?? filters.status;
-    const year = document.getElementById("utilYear")?.value.trim() ?? filters.year;
     filters.search = search;
     filters.status = status;
-    filters.year = year;
 
     try {
         [utilRows, utilFarmers] = await Promise.all([api.get("/utilization"), api.get("/farmers")]);
@@ -1222,7 +1320,6 @@ async function renderUtilizationModule(errorMessage = "") {
     const groups = allGroups
         .filter(group => utilActiveTab === "monitored" ? group.itemsToMonitor === 0 : group.itemsToMonitor > 0)
         .filter(group => {
-            if (utilActiveTab === "monitored" && year && !String(group.lastMonitoredDate || "").startsWith(year)) return false;
             if (term) {
                 const haystack = [group.farmerName, group.farmer.firstName, group.farmer.lastName,
                     group.farmer.middleName, group.farmer.barangay, group.farmer.municipality, group.farmer.province,
@@ -1252,8 +1349,7 @@ async function renderUtilizationModule(errorMessage = "") {
             <button class="btn btn-success">Filter</button>
         </form>` : `<form class="filter-bar" id="utilFilter">
             <input id="utilSearch" class="form-control" type="search" value="${escapeHtml(search)}" placeholder="Search farmer name or supply">
-            <input id="utilYear" class="form-control" type="number" min="2000" max="2100" value="${escapeHtml(year)}" placeholder="Year monitored">
-            <button class="btn btn-success">Filter</button>
+                        <button class="btn btn-success">Filter</button>
         </form>`}<div class="table-responsive"><table class="table align-middle utilization-table">
             <thead><tr><th class="tl">Farmer Name</th><th class="tl">Barangay</th><th class="tc">${utilActiveTab === "monitored" ? "Items Monitored" : "Items to Monitor"}</th>${utilActiveTab === "monitored" ? `<th class="tc">Last Monitored</th>` : ""}<th class="tc">Status</th><th class="tc">Action</th></tr></thead>
             <tbody>${groups.length ? groups.map(group => `<tr>
@@ -1281,8 +1377,8 @@ async function openUtilizationForm(r, onSaved) {
     const host=document.createElement("div");
     host.innerHTML=`<div class="modal fade" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content"><form id="utilForm">
     <div class="modal-header"><h5 class="modal-title">Monitor ${escapeHtml(r.itemName)} — ${escapeHtml(r.farmerName)}</h5><button class="btn-close" type="button" data-bs-dismiss="modal"></button></div>
-    <div class="modal-body"><p>Received: <strong>${r.receivedQuantity} ${escapeHtml(r.unit)}</strong>. The reported total cannot exceed this amount. Leave a field blank if it has not been reported.</p><div class="row g-3">
-    ${[["quantityUsed","Quantity used"],["quantityStillStocked","Quantity still stocked"],["quantityDisposed","Quantity disposed"]].map(([n,l])=>`<div class="col-md-4"><label class="form-label">${l}</label><input class="form-control" name="${n}" type="number" min="0" max="${r.receivedQuantity}" step="0.001" value="${r[n]??""}"></div>`).join("")}
+    <div class="modal-body"><p>Received: <strong>${r.receivedQuantity} ${escapeHtml(r.unit)}</strong>. The reported total cannot exceed this amount. Quantity used is required; still stocked and disposed are recorded as 0 when left blank.</p><div class="row g-3">
+    ${[["quantityUsed","Quantity used *",true],["quantityStillStocked","Quantity still stocked",false],["quantityDisposed","Quantity disposed",false]].map(([n,l,required])=>`<div class="col-md-4"><label class="form-label">${l}</label><input class="form-control" name="${n}" type="number" min="0" max="${r.receivedQuantity}" step="0.001" value="${r[n]??""}"${required?" required":""}></div>`).join("")}
     <input type="hidden" name="quantityNotYetUsed" value="${r.quantityNotYetUsed??""}">
     <div class="col-md-6"><label class="form-label">Monitoring date</label><input class="form-control" name="monitoringDate" type="date" value="${r.monitoringDate&&r.monitoringDate!=="0001-01-01"?r.monitoringDate:new Date().toISOString().slice(0,10)}" required></div>
     <div class="col-12"><label class="form-label">Remarks</label><textarea class="form-control" name="remarks" rows="2">${escapeHtml(r.remarks||"")}</textarea></div></div><div class="alert alert-info mt-3 mb-0" id="utilTotal"></div></div>
@@ -1291,7 +1387,10 @@ async function openUtilizationForm(r, onSaved) {
     const form=host.querySelector("#utilForm");
     const updateTotal=()=>{const sum=["quantityUsed","quantityStillStocked","quantityNotYetUsed","quantityDisposed"].reduce((a,n)=>a+(Number(form.elements[n].value)||0),0);host.querySelector("#utilTotal").textContent=`Reported total: ${sum} / ${r.receivedQuantity} ${r.unit} · Unreported: ${Math.max(0,r.receivedQuantity-sum)}`;return sum;};
     form.addEventListener("input",updateTotal);updateTotal();
-    form.addEventListener("submit",async e=>{e.preventDefault();const sum=updateTotal();if(sum>r.receivedQuantity){showToast("Reported quantities cannot exceed the received quantity.","danger");return;}
+    form.addEventListener("submit",async e=>{e.preventDefault();
+      if(form.elements.quantityUsed.value===""||Number(form.elements.quantityUsed.value)<0){showToast("Quantity used is required and must be 0 or above.","danger");return;}
+      ["quantityStillStocked","quantityDisposed"].forEach(n=>{if(form.elements[n].value==="")form.elements[n].value="0";});
+      const sum=updateTotal();if(sum>r.receivedQuantity){showToast("Reported quantities cannot exceed the received quantity.","danger");return;}
       const payload={};["quantityUsed","quantityStillStocked","quantityNotYetUsed","quantityDisposed"].forEach(n=>payload[n]=form.elements[n].value===""?null:Number(form.elements[n].value));payload.monitoringDate=form.elements.monitoringDate.value;payload.remarks=form.elements.remarks.value.trim()||null;
       try{await api.put(`/utilization/${r.distributionItemId}`,payload);modal.hide();showToast("Utilization monitoring saved.");await renderUtilizationModule();if(typeof onSaved==="function") onSaved();}catch(err){showToast(err.message,"danger");}
     });
@@ -1333,15 +1432,15 @@ async function renderSupplyModule(errorMessage = "") {
         ["stock-desc", "Stock: Highest to lowest"],
         ["stock-asc", "Stock: Lowest to highest"]
     ].map(([value, label]) => `<option value="${value}"${sort === value ? " selected" : ""}>${label}</option>`).join("");
-    mainContent.innerHTML = `${printDocumentHeader("Supply Management Report", "Assistance supplies and current stock levels")}<div class="view-header"><div><h2>Supply Management</h2><p>Track and manage stock of assistance supplies such as seeds, fertilizers, and tools.</p></div><div class="d-flex gap-2"><button class="btn btn-back" type="button" data-supply-action="print"><i class="bi bi-printer me-1"></i> Print</button><button class="btn btn-success" type="button" data-supply-action="add"><i class="bi bi-plus-lg me-1"></i> Add supply</button></div></div>
+    mainContent.innerHTML = `${printDocumentHeader("Supply Management Report", "Assistance supplies and current stock levels")}<div class="view-header"><div><h2>Supply Management</h2><p>Track and manage stock of assistance supplies such as seeds, fertilizers, and tools.</p></div><div class="d-flex gap-2"><div class="dropdown"><button class="btn btn-outline-success dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-file-earmark-excel me-1"></i> Excel</button><ul class="dropdown-menu dropdown-menu-dark"><li><button class="dropdown-item" type="button" data-excel="supplies-export"><i class="bi bi-file-earmark-arrow-down me-2"></i>Export to Excel</button></li></ul></div><button class="btn btn-back" type="button" data-supply-action="print"><i class="bi bi-printer me-1"></i> Print</button><button class="btn btn-success" type="button" data-supply-action="add"><i class="bi bi-plus-lg me-1"></i> Add supply</button></div></div>
         ${errorMessage ? `<div class="alert alert-danger">${escapeHtml(errorMessage)}</div>` : ""}
         <section class="content-panel"><form class="filter-bar" id="supplyFilter">
             <input id="supplySearch" class="form-control" type="search" value="${escapeHtml(search)}" placeholder="Search supply name or category">
             <select id="supplySort" class="form-select">${sortOptions}</select>
             <button class="btn btn-success" type="submit">Filter</button>
         </form><div class="table-responsive"><table class="table align-middle mb-0 supplies-table">
-            <colgroup><col class="col-supply-name"><col class="col-supply-category"><col class="tc"><col class="col-supply-unit"><col class="col-supply-actions"></colgroup>
-            <thead><tr><th class="tl">Name</th><th class="tl">Category</th><th class="tc">Stock Quantity</th><th class="tc">Unit</th><th class="tc">Actions</th></tr></thead><tbody id="supplyTableBody"></tbody></table></div></section>
+            <colgroup><col class="col-supply-name"><col class="col-supply-category"><col class="tc"><col class="col-supply-unit"><col class="col-supply-expiration"><col class="col-supply-actions"></colgroup>
+            <thead><tr><th class="tl">Name</th><th class="tl">Category</th><th class="tc">Stock Quantity</th><th class="tc">Unit</th><th class="tc">Expiration Date</th><th class="tc">Actions</th></tr></thead><tbody id="supplyTableBody"></tbody></table></div></section>
         ${printDocumentFooter()}`;
     document.getElementById("supplyFilter").addEventListener("submit", event => { event.preventDefault(); renderSupplyModule(); });
     document.getElementById("supplySort").addEventListener("change", () => renderSupplies());
@@ -1352,8 +1451,9 @@ async function renderSupplyModule(errorMessage = "") {
 function renderSupplies(errorMessage = "") {
     const body = document.getElementById("supplyTableBody");
     if (!body) return;
+    let visibleSupplyRows = [];
     if (errorMessage) {
-        body.innerHTML = `<tr><td colspan="5" class="empty-state">${escapeHtml(errorMessage)}</td></tr>`;
+        body.innerHTML = `<tr><td colspan="6" class="empty-state">${escapeHtml(errorMessage)}</td></tr>`;
         return;
     }
     const sort = document.getElementById("supplySort")?.value || "name-asc";
@@ -1364,8 +1464,9 @@ function renderSupplies(errorMessage = "") {
         }
         return String(a.name || "").localeCompare(String(b.name || ""), undefined, { sensitivity: "base" });
     });
+    visibleSupplyRows = rows;
     if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="5" class="empty-state"><i class="bi bi-box-seam"></i>No supplies match your search</td></tr>`;
+        body.innerHTML = `<tr><td colspan="6" class="empty-state"><i class="bi bi-box-seam"></i>No supplies match your search</td></tr>`;
         return;
     }
     body.innerHTML = rows.map(supply => {
@@ -1373,12 +1474,21 @@ function renderSupplies(errorMessage = "") {
         const stockCell = supply.isActive && qty <= 0
             ? `<span class="text-danger fw-semibold">Out of stock</span>`
             : `${qty.toLocaleString()}`;
+        let expirationCell = "—";
+        if (supply.expirationDate) {
+            const expiryText = String(supply.expirationDate).slice(0, 10);
+            const today = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00");
+            const days = Math.ceil((new Date(`${expiryText}T00:00:00`) - today) / 86400000);
+            const tone = days < 0 ? "text-danger fw-bold" : days <= 30 ? "text-warning fw-semibold" : "";
+            expirationCell = `<span class="${tone}" title="${days < 0 ? "Expired" : `${days} day(s) left`}">${escapeHtml(expiryText)}</span>`;
+        }
         return `
         <tr>
             <td class="tl">${escapeHtml(supply.name)}</td>
             <td class="tl col-text-wrap">${escapeHtml(supply.categoryName)}</td>
             <td class="tc col-text-nowrap">${stockCell}</td>
             <td class="tc col-text-nowrap">${escapeHtml(supply.unitOfMeasure)}</td>
+            <td class="tc col-text-nowrap">${expirationCell}</td>
             <td class="tc action-buttons">
                 <button class="btn btn-sm btn-outline-secondary" type="button" data-supply-action="view" data-id="${supply.supplyId}" title="View supply details"><i class="bi bi-eye"></i></button>
                 <button class="btn btn-sm btn-outline-success" type="button" data-supply-action="edit" data-id="${supply.supplyId}" title="Edit supply"><i class="bi bi-pencil"></i></button>
@@ -1389,6 +1499,35 @@ function renderSupplies(errorMessage = "") {
         `;
     }).join("");
     body.querySelectorAll("[data-supply-action]").forEach(button => button.addEventListener("click", () => handleSupplyAction(button)));
+
+    window.RISEPrint?.setContext("supplies", () => ({
+        title: "Inventory Report",
+        subtitle: "Assistance supplies and current stock levels",
+        meta: [
+            { label: "Report type", value: "Supply inventory" }
+        ],
+        blocks: [{
+            title: "Supply inventory",
+            columns: [
+                { key: "name", label: "Supply name" },
+                { key: "category", label: "Category" },
+                { key: "quantity", label: "Available quantity", align: "right" },
+                { key: "unit", label: "Unit", align: "center" },
+                { key: "status", label: "Stock status", align: "center" }
+            ],
+            rows: visibleSupplyRows.map(supply => {
+                const quantity = Math.round(Number(supply.stockQuantity || 0));
+                return {
+                    name: supply.name || "—",
+                    category: supply.categoryName || "—",
+                    quantity: quantity.toLocaleString(),
+                    unit: supply.unitOfMeasure || "—",
+                    status: quantity <= 0 ? "Out of stock" : "In stock"
+                };
+            }),
+            totals: [{ value: `Total: ${visibleSupplyRows.length}`, colspan: 5 }]
+        }]
+    }));
 }
 
 async function showSupplySummary(supplyId) {
@@ -1403,7 +1542,8 @@ async function showSupplySummary(supplyId) {
         supplySummaryTitle: supply.name,
         supplySummaryCategory: supply.categoryName || "—",
         supplySummaryUnit: supply.unitOfMeasure || "—",
-        supplySummaryStock: supply.isActive ? `${Math.round(Number(supply.stockQuantity || 0)).toLocaleString()} ${escapeHtml(supply.unitOfMeasure)}` : "Archived"
+        supplySummaryStock: supply.isActive ? `${Math.round(Number(supply.stockQuantity || 0)).toLocaleString()} ${escapeHtml(supply.unitOfMeasure)}` : "Archived",
+        supplySummaryExpiration: supply.expirationDate ? String(supply.expirationDate).slice(0, 10) : "—"
     };
     Object.entries(fields).forEach(([id, value]) => {
         const el = document.getElementById(id);
@@ -1423,6 +1563,8 @@ async function openSupplyModal(mode, id) {
     const readOnly = mode === "view";
     const saveLabel = mode === "add" ? "Save supply" : "Save changes";
     const readonlyAttr = readOnly ? "readonly" : "";
+    // Expiration date is fixed at creation so it cannot be manipulated later.
+    const expirationAttr = mode === "add" ? "" : "readonly";
     // Stock is adjusted through Add Stock; only the create form sets an initial quantity.
     const showStockField = mode !== "edit";
     const unitColClass = showStockField ? "col-md-4" : "col-md-6";
@@ -1439,6 +1581,7 @@ async function openSupplyModal(mode, id) {
             <div class="col-md-6"><label class="form-label">Name <span class="text-danger">*</span></label><input class="form-control" name="name" type="text" maxlength="200" value="${escapeHtml(record?.name || "")}" required ${readonlyAttr}></div>
             <div class="${unitColClass}"><label class="form-label">Unit of measure <span class="text-danger">*</span></label><input class="form-control" name="unitOfMeasure" type="text" maxlength="30" value="${escapeHtml(record?.unitOfMeasure || "")}" placeholder="e.g. kg, bag, piece" required ${readonlyAttr}></div>
             ${stockField}
+            <div class="${unitColClass}"><label class="form-label">Expiration date${mode === "add" ? "" : ' <span class="text-muted">(fixed)</span>'}</label><input class="form-control" name="expirationDate" type="date" value="${escapeHtml(record?.expirationDate ? String(record.expirationDate).slice(0, 10) : "")}" ${expirationAttr}></div>
         </div></div>
         <div class="modal-footer"><button class="btn btn-light" type="button" data-bs-dismiss="modal">${readOnly ? "Close" : "Cancel"}</button>${readOnly ? "" : `<button class="btn btn-success" type="submit">${saveLabel}</button>`}</div>
     </form></div></div></div>`;
@@ -1455,6 +1598,7 @@ async function openSupplyModal(mode, id) {
                 name: form.elements.name.value.trim(),
                 unitOfMeasure: form.elements.unitOfMeasure.value.trim(),
             };
+            if (mode === "add") payload.expirationDate = form.elements.expirationDate.value || null;
             if (mode === "add") payload.stockQuantity = Number(form.elements.stockQuantity.value);
             try {
                 if (id) await api.put(`/supplies/${id}`, payload);
@@ -1473,7 +1617,7 @@ async function openSupplyModal(mode, id) {
 async function handleSupplyAction(button) {
     const action = button.dataset.supplyAction;
     const id = Number(button.dataset.id);
-    if (action === "print") { window.print(); return; }
+    if (action === "print") { window.RISEPrint?.print("supplies"); return; }
     if (action === "add" || action === "edit") {
         await openSupplyModal(action, id);
         return;
@@ -1603,11 +1747,11 @@ async function renderRiseReports() {
     const usedMonths=[...usedMonthly.keys()].sort();
     const usedByCategory=new Map();
     rows.forEach(row=>{
-        const name=String(row.item||"");
-        const category=/seed/i.test(name)?"Seeds":(/fertil|urea|14-14-14|14x14|npk|ammonium/i.test(name)?"Fertilizer":"Other");
-        usedByCategory.set(category,(usedByCategory.get(category)||0)+Number(row.used||0));
+        const category=classifyAssistance(row.item);
+        const key=`${category} (${row.unit||"unit"})`;
+        usedByCategory.set(key,(usedByCategory.get(key)||0)+Number(row.used||0));
     });
-    const categoryLabels=[...usedByCategory.keys()].sort();
+    const categoryLabels=[...usedByCategory.keys()].sort(compareCategoriesLast);
     const seasonOrder = [...new Set([...allSeasons, activeSeason].filter(Boolean))].sort((a, b) => {
         const [ya, sa] = String(a).split("-"), [yb, sb] = String(b).split("-");
         return Number(ya) - Number(yb) || String(sa).localeCompare(String(sb));
@@ -1621,17 +1765,25 @@ async function renderRiseReports() {
         .filter(row => row.seasonKey === key).reduce((sum, row) => sum + Number(row.quantityUsed || 0), 0)));
     const lineLabels = seasonOrder.map(key => formatSeasonLabel(key));
     const lineValues = seasonOrder.map(key => seasonUsed.get(key) || 0);
+    const reportCategories = [...new Set(rows.map(row => classifyAssistance(row.item)))].sort(compareCategoriesLast);
+    const unitTotals = key => formatQuantityByUnit(rows.map(row => [classifyAssistance(row.item), row.unit, row[key]]), reportCategories);
+    const reportCardIcons = ["bi-people", "bi-clipboard-check", "bi-box-seam", "bi-check2-circle", "bi-boxes", "bi-trash3"];
     const reportCards = [
-        { label: "Total registered farmers", value: stats?.totalFarmers, button: "View Farmers", action: "farmers" },
+        { label: "Total Farmers Beneficiaries", value: stats?.totalFarmers, button: "View Farmers", action: "farmers" },
         { label: "To Monitor", value: reportToMonitor, button: "Continue monitor", action: "utilization" },
-        { label: "Total Quantity distributed", value: rows.reduce((sum, row) => sum + Number(row.quantity || 0), 0), button: "View details", action: "distributed" },
-        { label: "Total quantity used", value: rows.reduce((sum, row) => sum + Number(row.used || 0), 0), button: "View", action: "used" },
-        { label: "Still stocked", value: rows.reduce((sum, row) => sum + Number(row.stocked || 0), 0), button: "View supply", action: "supplies" },
-        { label: "Disposed", value: rows.reduce((sum, row) => sum + Number(row.disposed || 0), 0), button: "View", action: "disposed" }
+        { label: "Total Quantity distributed", display: unitTotals("quantity"), button: "View details", action: "distributed" },
+        { label: "Total quantity used", display: unitTotals("used"), button: "View", action: "used" },
+        { label: "Still stocked", display: unitTotals("stocked"), button: "View supply", action: "supplies" },
+        { label: "Disposed", display: unitTotals("disposed"), button: "View", action: "disposed" }
     ];
     mainContent.innerHTML=`<div class="view-header"><div><h2>Reports and Analytics</h2><p>Gain insights into farm operations, supply distribution, and harvest performance through organized reports and data-driven analytics</p></div><div class="d-flex gap-2 align-items-center"><select id="riseReportSeason" class="form-select" style="width:auto;min-width:170px"><option value="">Present</option>${pastSeasons.map(value=>`<option value="${escapeHtml(value)}"${value===season?" selected":""}>${escapeHtml(formatSeasonLabel(value))}</option>`).join("")}</select><button class="btn btn-outline-success" id="printRiseReport"><i class="bi bi-printer me-1"></i> Print / Save PDF</button></div></div>
     ${error?`<div class="alert alert-danger">${escapeHtml(error)}</div>`:""}
-    ${stats?`<section class="stat-grid">${reportCards.map(card=>`<article class="stat-card glass-card"><div class="stat-card-top"><span>${escapeHtml(card.label)}</span>${card.button?`<button class="stat-card-action" type="button" data-dashboard-card="${card.action}">${escapeHtml(card.button)}</button>`:""}</div><strong>${Number(card.value||0).toLocaleString()}</strong></article>`).join("")}</section>`:""}
+    ${stats?`<section class="stat-grid card-duo">${reportCards.map((card, index) => `<article class="stat-card glass-card"><div class="stat-card-top"><span>${escapeHtml(card.label)}</span><span class="stat-card-icon" aria-hidden="true"><i class="bi ${reportCardIcons[index] || "bi-bar-chart"}"></i></span></div>${card.display ? `<div class="stat-card-value stat-card-value-detail">${card.display}</div>` : `<strong class="stat-card-value stat-card-number">${Number(card.value || 0).toLocaleString()}</strong>`}${card.button ? `<div class="stat-card-foot"><button class="stat-card-action" type="button" data-dashboard-card="${card.action}">${escapeHtml(card.button)}</button></div>` : ""}</article>`).join("")}</section>`:""}
+    <section class="dashboard-grid pie-grid">
+      <article class="panel glass-panel"><div class="panel-header"><h3>Used supplies</h3></div><div class="chart-wrap"><canvas id="reportUsedPieChart"></canvas></div></article>
+      <article class="panel glass-panel"><div class="panel-header"><h3>Still stocked supplies</h3></div><div class="chart-wrap"><canvas id="reportStockedPieChart"></canvas></div></article>
+      <article class="panel glass-panel"><div class="panel-header"><h3>Disposed supplies</h3></div><div class="chart-wrap"><canvas id="reportDisposedPieChart"></canvas></div></article>
+    </section>
     <section class="dashboard-grid analytics-grid">
       <article class="panel glass-panel"><div class="panel-header"><h3>Supply Utilization Trends</h3></div><div class="chart-wrap"><canvas id="reportUsedLineChart"></canvas></div></article>
       <article class="panel glass-panel"><div class="panel-header"><h3>Used items by category</h3></div><div class="chart-wrap"><canvas id="reportUsedCategoryChart"></canvas></div></article>
@@ -1645,8 +1797,139 @@ async function renderRiseReports() {
     if(lineEl)reportCharts.push(new Chart(lineEl,{type:"line",data:{labels:lineLabels,datasets:[{label:"Quantity used",data:lineValues,borderColor:"#e5b33d",backgroundColor:"rgba(229,179,61,0.18)",pointBackgroundColor:"#e5b33d",tension:0.3,fill:true,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}}));
     const barEl=document.getElementById("reportUsedCategoryChart");
     if(barEl)reportCharts.push(new Chart(barEl,{type:"bar",data:{labels:categoryLabels,datasets:[{label:"Quantity used",data:categoryLabels.map(key=>usedByCategory.get(key)),backgroundColor:"rgba(114,168,86,0.65)",borderColor:"#72a856",borderWidth:1}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}}));
+    const piePalette = ["#2f7d55", "#e5b33d", "#6f9e7f", "#b9862f", "#4b6b57", "#9db9a2"];
+    const reportPie = (id, key) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const map = new Map();
+        rows.forEach(row => {
+            const quantity = Number(row[key] || 0);
+            if (quantity <= 0) return;
+            const label = `${classifyAssistance(row.item)} (${row.unit || "unit"})`;
+            map.set(label, (map.get(label) || 0) + quantity);
+        });
+        const entries = [...map.entries()].sort((a, b) => compareCategoriesLast(a[0], b[0]));
+        const labels = entries.map(entry => entry[0]);
+        const values = entries.map(entry => entry[1]);
+        const hasData = values.length > 0;
+        reportCharts.push(new Chart(el, {
+            type: "doughnut",
+            data: {
+                labels: hasData ? labels : ["No records"],
+                datasets: [{
+                    data: hasData ? values : [1],
+                    backgroundColor: hasData ? labels.map((_, i) => piePalette[i % piePalette.length]) : ["rgba(160, 160, 160, 0.18)"],
+                    borderColor: "rgba(6, 26, 17, 0.55)",
+                    borderWidth: 2,
+                    hoverOffset: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: "62%",
+                plugins: {
+                    legend: { position: "bottom", labels: { color: "#d7e2d8", boxWidth: 10, boxHeight: 10, padding: 12, font: { size: 11 } } },
+                    tooltip: { callbacks: { label: context => hasData ? ` ${context.label}: ${Number(context.parsed).toLocaleString(undefined, { maximumFractionDigits: 3 })}` : " No records" } }
+                }
+            }
+        }));
+    };
+    reportPie("reportUsedPieChart", "used");
+    reportPie("reportStockedPieChart", "stocked");
+    reportPie("reportDisposedPieChart", "disposed");
     document.getElementById("riseReportSeason")?.addEventListener("change",()=>renderRiseReports());
-    document.getElementById("printRiseReport")?.addEventListener("click",()=>window.print());
+    document.getElementById("printRiseReport")?.addEventListener("click",()=>window.RISEPrint?.print("reports"));
+    window.RISEPrint?.setContext("reports", () => {
+        const quantityText = key => {
+            const totals = new Map();
+            filtered.forEach(row => {
+                const unit = row.unit || "unit";
+                totals.set(unit, (totals.get(unit) || 0) + Number(row[key] || 0));
+            });
+            return [...totals.entries()].filter(([, value]) => value > 0)
+                .map(([unit, value]) => `${value.toLocaleString(undefined, { maximumFractionDigits: 3 })} ${unit}`).join(", ") || "—";
+        };
+        const seasonLabel = typeof formatSeasonLabel === "function" ? formatSeasonLabel(effectiveSeason) : effectiveSeason;
+        const seasonRange = season ? seasonDateRange(season) : null;
+        const period = seasonRange
+            ? `${new Date(`${seasonRange[0]}T00:00:00`).toLocaleDateString("en-PH")} to ${new Date(`${seasonRange[1]}T00:00:00`).toLocaleDateString("en-PH")}`
+            : "Present season";
+        return {
+            title: "Statistical Report",
+            subtitle: "Assistance distribution and supply utilization",
+            landscape: true,
+            meta: [
+                { label: "Report type", value: "Reports and analytics" },
+                { label: "Cropping season", value: seasonLabel || "—" },
+                { label: "Reporting period", value: period },
+                { label: "Records included", value: filtered.length },
+                { label: "Season dropdown", value: document.getElementById("riseReportSeason")?.selectedOptions[0]?.textContent || "Present" }
+            ],
+            blocks: [
+                { title: "Summary", fields: [
+                    ["Total Farmers Beneficiaries", stats?.totalFarmers ?? "—"],
+                    ["Farmers to monitor", reportToMonitor],
+                    ["Distribution items included", filtered.length],
+                    ["Quantity distributed", quantityText("quantity")],
+                    ["Quantity used", quantityText("used")],
+                    ["Quantity still stocked", quantityText("stocked")],
+                    ["Quantity disposed", quantityText("disposed")]
+                ] },
+                { title: "Distribution by assistance type",
+                  columns: [{ key: "name", label: "Assistance type" }, { key: "records", label: "Records", align: "right" }, { key: "quantity", label: "Total quantity", align: "right" }],
+                  rows: byType,
+                  totals: [
+                      { value: "TOTAL", colspan: 1 },
+                      { value: byType.reduce((sum, item) => sum + item.records, 0), align: "right" },
+                      { value: byType.reduce((sum, item) => sum + item.quantity, 0).toLocaleString(), align: "right" }
+                  ] },
+                { title: "Distribution by barangay",
+                  columns: [{ key: "name", label: "Barangay" }, { key: "records", label: "Records", align: "right" }, { key: "quantity", label: "Total quantity", align: "right" }],
+                  rows: byBarangay,
+                  totals: [
+                      { value: "TOTAL", colspan: 1 },
+                      { value: byBarangay.reduce((sum, item) => sum + item.records, 0), align: "right" },
+                      { value: byBarangay.reduce((sum, item) => sum + item.quantity, 0).toLocaleString(), align: "right" }
+                  ] },
+                { title: "Supply utilization by category",
+                  columns: [{ key: "label", label: "Category and unit" }, { key: "used", label: "Quantity used", align: "right" }],
+                  rows: categoryLabels.map(label => ({ label, used: Number(usedByCategory.get(label) || 0).toLocaleString(undefined, { maximumFractionDigits: 3 }) })) },
+                { title: "Monthly utilization trend",
+                  columns: [{ key: "month", label: "Month" }, { key: "used", label: "Quantity used", align: "right" }],
+                  rows: usedMonths.map(month => ({ month, used: Number(usedMonthly.get(month) || 0).toLocaleString(undefined, { maximumFractionDigits: 3 }) })) },
+                { title: "Distribution records",
+                  columns: [
+                      { key: "reference", label: "Reference no." },
+                      { key: "farmer", label: "Farmer" },
+                      { key: "barangay", label: "Barangay" },
+                      { key: "date", label: "Distribution date" },
+                      { key: "item", label: "Supply item" },
+                      { key: "category", label: "Category" },
+                      { key: "quantity", label: "Quantity", align: "right" },
+                      { key: "unit", label: "Unit", align: "center" },
+                      { key: "used", label: "Used", align: "right" },
+                      { key: "stocked", label: "Stocked", align: "right" },
+                      { key: "disposed", label: "Disposed", align: "right" }
+                  ],
+                  rows: filtered.map(row => ({
+                      reference: row.distributionId ? `#${row.distributionId}` : "—",
+                      farmer: row.farmer || "—",
+                      barangay: row.barangay || "—",
+                      date: row.distributionDate || "—",
+                      item: row.item || "—",
+                      category: classifyAssistance(row.item),
+                      quantity: Number(row.quantity || 0).toLocaleString(undefined, { maximumFractionDigits: 3 }),
+                      unit: row.unit || "—",
+                      used: row.used === null || row.used === undefined ? "—" : Number(row.used).toLocaleString(undefined, { maximumFractionDigits: 3 }),
+                      stocked: row.stocked === null || row.stocked === undefined ? "—" : Number(row.stocked).toLocaleString(undefined, { maximumFractionDigits: 3 }),
+                      disposed: row.disposed === null || row.disposed === undefined ? "—" : Number(row.disposed).toLocaleString(undefined, { maximumFractionDigits: 3 })
+                  })),
+                  totals: [{ value: `Total: ${filtered.length}`, colspan: 11 }]
+                }
+            ]
+        };
+    });
     mainContent.querySelectorAll("[data-dashboard-card]").forEach(button => button.addEventListener("click", () => {
         const action = button.dataset.dashboardCard;
         if (action === "distributed") openDistributedQuantityModal();
@@ -1668,7 +1951,7 @@ function handleDynamicAction(event) {
     if (action === "profile") showProfile(farmerFromButton(button));
     if (action === "edit") openEditForm(farmerFromButton(button));
     if (action === "archive") archiveFarmer(farmerFromButton(button));
-    if (action === "print") window.print();
+    if (action === "print") window.RISEPrint?.print("farmers");
 }
 
 function farmerFromButton(button) {
@@ -1749,6 +2032,53 @@ function parseApiDate(value) {
     if (!value) return 0;
     const text = String(value);
     return new Date(/[zZ]|[+-]\d{2}:\d{2}$/.test(text) ? text : `${text}Z`).getTime();
+}
+
+function classifyAssistance(name) {
+    const text = String(name || "");
+    if (/seed/i.test(text)) return "Seeds";
+    if (/fertil|urea|14-14-14|14x14|npk|ammonium/i.test(text)) return "Fertilizer";
+    return "Other";
+}
+
+function compareCategoriesLast(a, b) {
+    const aOther = /^other\b/i.test(String(a || ""));
+    const bOther = /^other\b/i.test(String(b || ""));
+    if (aOther !== bOther) return aOther ? 1 : -1;
+    return String(a || "").localeCompare(String(b || ""), undefined, { sensitivity: "base" });
+}
+
+function normalizeUnit(unit) {
+    const value = String(unit || "unit").trim().toLowerCase();
+    return value === "pcs" || value === "pieces" ? "pc"
+        : value === "sacks" ? "sack"
+        : value === "bags" ? "bag"
+        : value === "kgs" ? "kg" : value;
+}
+
+function formatQuantityByUnit(entries, categoryOrder = null) {
+    const grouped = new Map();
+    entries.forEach(([category, unit, quantity]) => {
+        const name = category || "Other";
+        if (!grouped.has(name)) grouped.set(name, new Map());
+        const units = grouped.get(name);
+        const key = normalizeUnit(unit);
+        units.set(key, (units.get(key) || 0) + Number(quantity || 0));
+    });
+    if (!grouped.size) return "0";
+    const order = categoryOrder && categoryOrder.length
+        ? categoryOrder
+        : [...grouped.keys()].sort(compareCategoriesLast);
+    return `<div class="qty-panel">${order.map(category => {
+        const units = grouped.get(category);
+        const measures = units ? [...units.entries()].filter(([, quantity]) => quantity > 0) : [];
+        const plainValues = measures
+            .map(([unit, quantity]) => `${quantity.toLocaleString(undefined, { maximumFractionDigits: 3 })} ${unit}`).join(", ");
+        const values = measures.map(([unit, quantity]) =>
+            `<span class="qty-measure"><span class="qty-amount">${quantity.toLocaleString(undefined, { maximumFractionDigits: 3 })}</span><span class="qty-unit">${escapeHtml(unit)}</span></span>`
+        ).join('<span class="qty-measure-sep"> · </span>');
+        return `<div class="qty-row"><span class="qty-row-label">${escapeHtml(category)}</span><span class="qty-row-value"${plainValues ? ` title="${escapeHtml(plainValues)}"` : ""}>${measures.length ? values : '<span class="qty-amount">0</span>'}</span></div>`;
+    }).join("")}</div>`;
 }
 
 function showSeasonCreatedDialog(season, monthName, year) {

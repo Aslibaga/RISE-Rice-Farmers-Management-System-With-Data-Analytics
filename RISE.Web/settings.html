@@ -182,6 +182,12 @@
                             <div class="info-row"><span>Account Role</span><strong id="roleDisplay2"></strong></div>
                             <div class="info-row"><span>Account Status</span><span>Active</span></div>
                         </div>
+                        <div class="settings-card mt-3">
+                            <h5>Server Connection</h5>
+                            <p>Point this app to your RISE API server (useful when installed on other PCs).</p>
+                            <div class="field"><label>API Server URL</label><input type="url" id="apiBaseUrl" placeholder="http://server:5000"></div>
+                            <button class="btn btn-gold mt-3" id="saveApiBaseBtn" type="button">Save Server URL</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -205,6 +211,7 @@
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="pages/css/js/config.js"></script>
     <script src="pages/css/js/auth.js"></script>
     <script>
         if (!window.RISEAuth.isAuthenticated()) { window.location.href='login.html'; }
@@ -235,8 +242,13 @@
                 if (el) el.style.display = 'block';
             });
         });
+        document.getElementById('apiBaseUrl').value = window.RISE_API_BASE || '';
+        document.getElementById('saveApiBaseBtn').addEventListener('click', () => {
+            const ok = window.RISE_setApiBase(document.getElementById('apiBaseUrl').value);
+            showSettingsMessage(ok ? 'Server URL saved. Reload the app to apply.' : 'Enter a valid URL starting with http:// or https://', ok ? 'success' : 'danger');
+        });
         async function loadSettings() {
-            const res = await fetch('http://localhost:5000/api/auth/me', { headers: { 'Authorization': 'Bearer ' + window.RISEAuth.getToken() } });
+            const res = await fetch(window.RISE_API_BASE + '/api/auth/me', { headers: { 'Authorization': 'Bearer ' + window.RISEAuth.getToken() } });
             const user = await res.json();
             document.getElementById('roleDisplay').textContent = user.role || 'Not available';
             document.getElementById('roleDisplay2').textContent = user.role || 'Not available';
@@ -263,7 +275,7 @@
         async function settingsRequest(path, body, button, successMessage) {
             if (button) { button.disabled = true; button.dataset.originalText = button.textContent; button.textContent = 'Saving…'; }
             try {
-                const res = await fetch('http://localhost:5000/api' + path, {
+                const res = await fetch(window.RISE_API_BASE + '/api' + path, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + window.RISEAuth.getToken() },
                     body: JSON.stringify(body)
@@ -327,7 +339,7 @@
             const btn = document.getElementById('confirmDeleteAccountBtn');
             btn.disabled = true; btn.textContent = 'Deleting...';
             const pwd = document.getElementById('deletePassword').value;
-            const res = await fetch('http://localhost:5000/api/auth/account', { method:'DELETE', headers: { 'Content-Type':'application/json', 'Authorization': 'Bearer ' + window.RISEAuth.getToken() }, body: JSON.stringify({ CurrentPassword: pwd }) });
+            const res = await fetch(window.RISE_API_BASE + '/api/auth/account', { method:'DELETE', headers: { 'Content-Type':'application/json', 'Authorization': 'Bearer ' + window.RISEAuth.getToken() }, body: JSON.stringify({ CurrentPassword: pwd }) });
             btn.disabled = false; btn.textContent = 'Delete';
             if (res.ok) {
                 await window.RISEAuth.logout();

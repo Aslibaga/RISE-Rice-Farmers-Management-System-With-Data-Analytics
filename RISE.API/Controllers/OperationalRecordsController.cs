@@ -22,267 +22,10 @@ public sealed class OperationalRecordsController : ControllerBase
         _logger = logger;
     }
 
-    [HttpGet("api/associations")]
-    public async Task<ActionResult<IReadOnlyList<AssociationDto>>> GetAssociations(
-        [FromQuery] string? search,
-        CancellationToken cancellationToken)
-    {
-        var query = _context.FarmerAssociations.AsNoTracking().AsQueryable();
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            query = query.Where(association => association.Name.Contains(search));
-        }
-
-        return Ok(await query
-            .OrderBy(association => association.Name)
-            .Select(association => new AssociationDto(
-                association.FarmerAssociationId,
-                association.Name,
-                association.Farmers.Count(farmer => farmer.IsActive)))
-            .ToListAsync(cancellationToken));
-    }
-
-    [HttpGet("api/associations/{id:int}")]
-    public async Task<ActionResult<AssociationDto>> GetAssociation(
-        int id,
-        CancellationToken cancellationToken)
-    {
-        var association = await _context.FarmerAssociations.AsNoTracking()
-            .Where(item => item.FarmerAssociationId == id)
-            .Select(item => new AssociationDto(
-                item.FarmerAssociationId, item.Name,
-                item.Farmers.Count(farmer => farmer.IsActive)))
-            .FirstOrDefaultAsync(cancellationToken);
-        return association is null ? NotFound() : Ok(association);
-    }
-
-    [HttpPost("api/associations")]
-    public async Task<ActionResult<AssociationDto>> CreateAssociation(
-        AssociationWriteDto request,
-        CancellationToken cancellationToken)
-    {
-        var name = request.Name.Trim();
-        if (await _context.FarmerAssociations.AnyAsync(
-                association => association.Name == name, cancellationToken))
-        {
-            return Conflict("An association with this name already exists.");
-        }
-
-        var association = new FarmerAssociation { Name = name };
-        _context.FarmerAssociations.Add(association);
-        await _context.SaveChangesAsync(cancellationToken);
-
-        return CreatedAtAction(
-            nameof(GetAssociation),
-            new { id = association.FarmerAssociationId },
-            new AssociationDto(association.FarmerAssociationId, association.Name, 0));
-    }
-
-    [HttpPut("api/associations/{id:int}")]
-    public async Task<IActionResult> UpdateAssociation(
-        int id,
-        AssociationWriteDto request,
-        CancellationToken cancellationToken)
-    {
-        var association = await _context.FarmerAssociations
-            .FirstOrDefaultAsync(item => item.FarmerAssociationId == id, cancellationToken);
-        if (association is null)
-        {
-            return NotFound();
-        }
-
-        var name = request.Name.Trim();
-        if (await _context.FarmerAssociations.AnyAsync(
-                item => item.FarmerAssociationId != id && item.Name == name,
-                cancellationToken))
-        {
-            return Conflict("An association with this name already exists.");
-        }
-
-        association.Name = name;
-        try
-        {
-            await _context.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException exception)
-        {
-            _logger.LogError(exception, "Could not rename association {AssociationId}.", id);
-            return Conflict("An association with this name may already exist.");
-        }
-        return NoContent();
-    }
-
-    [HttpDelete("api/associations/{id:int}")]
-    public async Task<IActionResult> DeleteAssociation(
-        int id,
-        CancellationToken cancellationToken)
-    {
-        var association = await _context.FarmerAssociations
-            .FirstOrDefaultAsync(item => item.FarmerAssociationId == id, cancellationToken);
-        if (association is null)
-        {
-            return NotFound();
-        }
-
-        if (await _context.Farmers.AnyAsync(
-                farmer => farmer.FarmerAssociationId == id, cancellationToken))
-        {
-            return Conflict("This association is still assigned to one or more farmers.");
-        }
-
-        _context.FarmerAssociations.Remove(association);
-        try
-        {
-            await _context.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException exception)
-        {
-            _logger.LogError(exception, "Could not delete association {AssociationId}.", id);
-            return Conflict("This association could not be deleted because it is still referenced.");
-        }
-        return NoContent();
-    }
-
-    [HttpGet("api/farms")]
-    public async Task<ActionResult<IReadOnlyList<FarmDto>>> GetFarms(
-        [FromQuery] string? search,
-        [FromQuery] int? farmerId,
-        [FromQuery] bool includeArchived,
-        CancellationToken cancellationToken)
-    {
-        var query = _context.Farms.AsNoTracking().AsQueryable();
-        if (!includeArchived)
-        {
-            query = query.Where(farm => farm.IsActive);
-        }
-        if (farmerId.HasValue)
-        {
-            query = query.Where(farm => farm.FarmerId == farmerId.Value);
-        }
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            query = query.Where(farm =>
-                farm.Name.Contains(search) ||
-                farm.Barangay.Contains(search) ||
-                farm.Municipality.Contains(search) ||
-                farm.Farmer.FullName.Contains(search));
-        }
-
-        return Ok(await query.OrderBy(farm => farm.Name)
-            .Select(farm => new FarmDto(
-                farm.FarmId, farm.FarmerId, farm.Farmer.FullName, farm.Name,
-                farm.Barangay, farm.Municipality, farm.AreaHectares, farm.SoilType,
-                farm.IsActive))
-            .ToListAsync(cancellationToken));
-    }
-
-    [HttpGet("api/farms/{id:int}")]
-    public async Task<ActionResult<FarmDto>> GetFarm(
-        int id,
-        CancellationToken cancellationToken)
-    {
-        var result = await _context.Farms.AsNoTracking()
-            .Where(farm => farm.FarmId == id)
-            .Select(farm => new FarmDto(
-                farm.FarmId, farm.FarmerId, farm.Farmer.FullName, farm.Name,
-                farm.Barangay, farm.Municipality, farm.AreaHectares, farm.SoilType,
-                farm.IsActive))
-            .FirstOrDefaultAsync(cancellationToken);
-
-        return result is null ? NotFound() : Ok(result);
-    }
-
-    [HttpPost("api/farms")]
-    public async Task<ActionResult<FarmDto>> CreateFarm(
-        FarmWriteDto request,
-        CancellationToken cancellationToken)
-    {
-        if (!await _context.Farmers.AnyAsync(
-                farmer => farmer.FarmerId == request.FarmerId && farmer.IsActive,
-                cancellationToken))
-        {
-            return BadRequest("Select an active farmer for this farm.");
-        }
-
-        var farm = new Farm
-        {
-            FarmerId = request.FarmerId,
-            Name = request.Name.Trim(),
-            Barangay = request.Barangay.Trim(),
-            Municipality = request.Municipality.Trim(),
-            AreaHectares = request.AreaHectares,
-            SoilType = Clean(request.SoilType),
-            IsActive = true
-        };
-        _context.Farms.Add(farm);
-        await _context.SaveChangesAsync(cancellationToken);
-
-        var farmerName = await _context.Farmers.Where(item => item.FarmerId == farm.FarmerId)
-            .Select(item => item.FullName).SingleAsync(cancellationToken);
-        var result = new FarmDto(
-            farm.FarmId, farm.FarmerId, farmerName, farm.Name, farm.Barangay,
-            farm.Municipality, farm.AreaHectares, farm.SoilType, farm.IsActive);
-        return CreatedAtAction(nameof(GetFarm), new { id = farm.FarmId }, result);
-    }
-
-    [HttpPut("api/farms/{id:int}")]
-    public async Task<IActionResult> UpdateFarm(
-        int id,
-        FarmWriteDto request,
-        CancellationToken cancellationToken)
-    {
-        var farm = await _context.Farms.FirstOrDefaultAsync(
-            item => item.FarmId == id && item.IsActive, cancellationToken);
-        if (farm is null)
-        {
-            return NotFound();
-        }
-        if (!await _context.Farmers.AnyAsync(
-                farmer => farmer.FarmerId == request.FarmerId && farmer.IsActive,
-                cancellationToken))
-        {
-            return BadRequest("Select an active farmer for this farm.");
-        }
-
-        farm.FarmerId = request.FarmerId;
-        farm.Name = request.Name.Trim();
-        farm.Barangay = request.Barangay.Trim();
-        farm.Municipality = request.Municipality.Trim();
-        farm.AreaHectares = request.AreaHectares;
-        farm.SoilType = Clean(request.SoilType);
-        await _context.SaveChangesAsync(cancellationToken);
-        return NoContent();
-    }
-
-    [HttpDelete("api/farms/{id:int}")]
-    public async Task<IActionResult> ArchiveFarm(
-        int id,
-        CancellationToken cancellationToken)
-    {
-        var farm = await _context.Farms.FirstOrDefaultAsync(
-            item => item.FarmId == id, cancellationToken);
-        if (farm is null)
-        {
-            return NotFound();
-        }
-        farm.IsActive = false;
-        try
-        {
-            await _context.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException exception)
-        {
-            _logger.LogError(exception, "Could not archive farm {FarmId}.", id);
-            return Conflict("This farm cannot be archived while it has related operational records.");
-        }
-        return NoContent();
-    }
-
     [HttpGet("api/planting")]
     public async Task<ActionResult<IReadOnlyList<PlantingDto>>> GetPlantings(
         [FromQuery] string? search,
         [FromQuery] string? status,
-        [FromQuery] int? farmId,
         CancellationToken cancellationToken)
     {
         var query = _context.PlantingRecords.AsNoTracking().AsQueryable();
@@ -290,23 +33,15 @@ public sealed class OperationalRecordsController : ControllerBase
         {
             query = query.Where(record =>
                 record.CropName.Contains(search) ||
-                (record.Variety != null && record.Variety.Contains(search)) ||
-                record.Farm.Name.Contains(search) ||
-                record.Farm.Farmer.FullName.Contains(search));
+                (record.Variety != null && record.Variety.Contains(search)));
         }
         if (!string.IsNullOrWhiteSpace(status))
         {
             query = query.Where(record => record.Status == status);
         }
-        if (farmId.HasValue)
-        {
-            query = query.Where(record => record.FarmId == farmId.Value);
-        }
-
         return Ok(await query.OrderByDescending(record => record.PlantingDate)
             .Select(record => new PlantingDto(
-                record.PlantingRecordId, record.FarmId, record.Farm.Name,
-                record.Farm.Farmer.FullName, record.CropName, record.Variety,
+                record.PlantingRecordId, record.CropName, record.Variety,
                 record.Season, record.PlantingDate, record.AreaPlantedHectares,
                 record.ExpectedHarvestDate, record.Status))
             .ToListAsync(cancellationToken));
@@ -320,8 +55,7 @@ public sealed class OperationalRecordsController : ControllerBase
         var record = await _context.PlantingRecords.AsNoTracking()
             .Where(item => item.PlantingRecordId == id)
             .Select(item => new PlantingDto(
-                item.PlantingRecordId, item.FarmId, item.Farm.Name,
-                item.Farm.Farmer.FullName, item.CropName, item.Variety,
+                item.PlantingRecordId, item.CropName, item.Variety,
                 item.Season, item.PlantingDate, item.AreaPlantedHectares,
                 item.ExpectedHarvestDate, item.Status))
             .FirstOrDefaultAsync(cancellationToken);
@@ -333,12 +67,6 @@ public sealed class OperationalRecordsController : ControllerBase
         PlantingWriteDto request,
         CancellationToken cancellationToken)
     {
-        if (!await _context.Farms.AnyAsync(
-                farm => farm.FarmId == request.FarmId && farm.IsActive,
-                cancellationToken))
-        {
-            return BadRequest("Select an active farm for this planting record.");
-        }
         var validation = ValidatePlantingDates(request.PlantingDate, request.ExpectedHarvestDate);
         if (validation is not null)
         {
@@ -347,7 +75,6 @@ public sealed class OperationalRecordsController : ControllerBase
 
         var record = new PlantingRecord
         {
-            FarmId = request.FarmId,
             CropName = request.CropName.Trim(),
             Variety = Clean(request.Variety),
             Season = Clean(request.Season),
@@ -374,19 +101,12 @@ public sealed class OperationalRecordsController : ControllerBase
         {
             return NotFound();
         }
-        if (!await _context.Farms.AnyAsync(
-                farm => farm.FarmId == request.FarmId && farm.IsActive,
-                cancellationToken))
-        {
-            return BadRequest("Select an active farm for this planting record.");
-        }
         var validation = ValidatePlantingDates(request.PlantingDate, request.ExpectedHarvestDate);
         if (validation is not null)
         {
             return BadRequest(validation);
         }
 
-        record.FarmId = request.FarmId;
         record.CropName = request.CropName.Trim();
         record.Variety = Clean(request.Variety);
         record.Season = Clean(request.Season);
@@ -434,7 +154,8 @@ public sealed class OperationalRecordsController : ControllerBase
         {
             query = query.Where(record =>
                 record.PlantingRecord.CropName.Contains(search) ||
-                record.PlantingRecord.Farm.Farmer.FullName.Contains(search) ||
+                (record.PlantingRecord.SeedDistributionItem != null &&
+                 record.PlantingRecord.SeedDistributionItem.Distribution.Farmer.FullName.Contains(search)) ||
                 (record.Grade != null && record.Grade.Contains(search)));
         }
         if (from.HasValue)
@@ -450,7 +171,7 @@ public sealed class OperationalRecordsController : ControllerBase
             .Select(record => new HarvestDto(
                 record.HarvestRecordId, record.PlantingRecordId,
                 record.PlantingRecord.CropName,
-                record.PlantingRecord.Farm.Farmer.FullName,
+                (record.PlantingRecord.SeedDistributionItem == null ? "" : record.PlantingRecord.SeedDistributionItem.Distribution.Farmer.FullName),
                 record.HarvestDate, record.QuantityKilograms,
                 record.MoisturePercent, record.Grade, record.Notes))
             .ToListAsync(cancellationToken));
@@ -466,7 +187,7 @@ public sealed class OperationalRecordsController : ControllerBase
             .Select(item => new HarvestDto(
                 item.HarvestRecordId, item.PlantingRecordId,
                 item.PlantingRecord.CropName,
-                item.PlantingRecord.Farm.Farmer.FullName,
+                (item.PlantingRecord.SeedDistributionItem == null ? "" : item.PlantingRecord.SeedDistributionItem.Distribution.Farmer.FullName),
                 item.HarvestDate, item.QuantityKilograms,
                 item.MoisturePercent, item.Grade, item.Notes))
             .FirstOrDefaultAsync(cancellationToken);
@@ -578,7 +299,8 @@ public sealed class OperationalRecordsController : ControllerBase
         return Ok(await query.OrderBy(supply => supply.Name)
             .Select(supply => new SupplyDto(
                 supply.SupplyId, supply.SupplyCategoryId, supply.Category.Name,
-                supply.Name, supply.UnitOfMeasure, supply.StockQuantity, supply.IsActive, supply.UnitCost))
+                supply.Name, supply.UnitOfMeasure, supply.StockQuantity, supply.IsActive, supply.UnitCost,
+                supply.ExpirationDate))
             .ToListAsync(cancellationToken));
     }
 
@@ -737,7 +459,8 @@ public sealed class OperationalRecordsController : ControllerBase
             .Where(item => item.SupplyId == id)
             .Select(item => new SupplyDto(
                 item.SupplyId, item.SupplyCategoryId, item.Category.Name,
-                item.Name, item.UnitOfMeasure, item.StockQuantity, item.IsActive, item.UnitCost))
+                item.Name, item.UnitOfMeasure, item.StockQuantity, item.IsActive, item.UnitCost,
+                item.ExpirationDate))
             .FirstOrDefaultAsync(cancellationToken);
         return supply is null ? NotFound() : Ok(supply);
     }
@@ -787,6 +510,7 @@ public sealed class OperationalRecordsController : ControllerBase
             UnitOfMeasure = request.UnitOfMeasure.Trim(),
             UnitCost = request.UnitCost,
             StockQuantity = request.StockQuantity ?? 0m,
+            ExpirationDate = request.ExpirationDate,
             IsActive = true
         };
         _context.Supplies.Add(supply);
@@ -902,7 +626,6 @@ public sealed class OperationalRecordsController : ControllerBase
         }
         supply.StockQuantity += request.StockQuantity;
         if (supply.StockQuantity < 0) supply.StockQuantity = 0;
-        supply.UpdatedAtUtc = DateTime.UtcNow;
         await _context.SaveChangesAsync(cancellationToken);
         return NoContent();
     }

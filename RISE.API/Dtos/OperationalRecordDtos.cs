@@ -2,51 +2,8 @@ using System.ComponentModel.DataAnnotations;
 
 namespace RISE.API.Dtos;
 
-public sealed record AssociationDto(int FarmerAssociationId, string Name, int FarmerCount);
-
-public sealed class AssociationWriteDto
-{
-    [Required, StringLength(150, MinimumLength = 2)]
-    public string Name { get; set; } = string.Empty;
-}
-
-public sealed record FarmDto(
-    int FarmId,
-    int FarmerId,
-    string FarmerName,
-    string Name,
-    string Barangay,
-    string Municipality,
-    decimal AreaHectares,
-    string? SoilType,
-    bool IsActive);
-
-public sealed class FarmWriteDto
-{
-    [Range(1, int.MaxValue)]
-    public int FarmerId { get; set; }
-
-    [Required, StringLength(150, MinimumLength = 2)]
-    public string Name { get; set; } = string.Empty;
-
-    [Required, StringLength(100)]
-    public string Barangay { get; set; } = string.Empty;
-
-    [Required, StringLength(100)]
-    public string Municipality { get; set; } = string.Empty;
-
-    [Range(typeof(decimal), "0.0001", "99999999.9999")]
-    public decimal AreaHectares { get; set; }
-
-    [StringLength(100)]
-    public string? SoilType { get; set; }
-}
-
 public sealed record PlantingDto(
     int PlantingRecordId,
-    int FarmId,
-    string FarmName,
-    string FarmerName,
     string CropName,
     string? Variety,
     string? Season,
@@ -57,9 +14,6 @@ public sealed record PlantingDto(
 
 public sealed class PlantingWriteDto
 {
-    [Range(1, int.MaxValue)]
-    public int FarmId { get; set; }
-
     [Required, StringLength(100)]
     public string CropName { get; set; } = "Rice";
 
@@ -119,7 +73,8 @@ public sealed record SupplyDto(
     string UnitOfMeasure,
     decimal StockQuantity,
     bool IsActive,
-    decimal UnitCost);
+    decimal UnitCost,
+    DateTime? ExpirationDate);
 
 public sealed class SupplyWriteDto
 {
@@ -139,6 +94,8 @@ public sealed class SupplyWriteDto
 
     [Range(typeof(decimal), "0", "999999999999999.999")]
     public decimal? StockQuantity { get; set; }
+
+    public DateTime? ExpirationDate { get; set; }
 }
 
 public sealed class AddStockRequest

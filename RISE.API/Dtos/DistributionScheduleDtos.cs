@@ -9,6 +9,7 @@ public sealed record DistributionScheduleDto(
     string FarmerName,
     DateOnly DistributionDate,
     string AssistanceType,
+    string ItemName,
     string CroppingSeason,
     decimal QuantityDistributed,
     int FarmerBeneficiaries,

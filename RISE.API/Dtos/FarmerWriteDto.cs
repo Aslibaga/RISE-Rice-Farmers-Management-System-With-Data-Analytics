@@ -28,7 +28,4 @@ public sealed class FarmerWriteDto
 
     [StringLength(100)]
     public string? Municipality { get; set; }
-
-    [StringLength(150)]
-    public string? AssociationName { get; set; }
 }

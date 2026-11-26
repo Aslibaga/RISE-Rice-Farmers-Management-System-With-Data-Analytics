@@ -353,9 +353,7 @@ public class AuthController : ControllerBase
         await _context.Database.ExecuteSqlRawAsync("DELETE FROM PlantingRecords", cancellationToken);
         await _context.Database.ExecuteSqlRawAsync("DELETE FROM Distributions", cancellationToken);
         await _context.Database.ExecuteSqlRawAsync("DELETE FROM SupportingDocuments", cancellationToken);
-        await _context.Database.ExecuteSqlRawAsync("DELETE FROM Farms", cancellationToken);
         await _context.Database.ExecuteSqlRawAsync("DELETE FROM Farmers", cancellationToken);
-        await _context.Database.ExecuteSqlRawAsync("DELETE FROM FarmerAssociations", cancellationToken);
         await _context.Database.ExecuteSqlRawAsync("DELETE FROM Supplies", cancellationToken);
         await _context.Database.ExecuteSqlRawAsync("DELETE FROM SupplyCategories", cancellationToken);
         await _context.Database.ExecuteSqlRawAsync("DELETE FROM Suppliers", cancellationToken);

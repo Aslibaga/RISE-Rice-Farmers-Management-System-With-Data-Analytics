@@ -12,7 +12,7 @@
 
     async function load() {
         const body = document.getElementById("scheduleTableBody");
-        if (body) body.innerHTML = `<tr><td colspan="9" class="empty-state">Loading distribution schedule...</td></tr>`;
+        if (body) body.innerHTML = `<tr><td colspan="10" class="empty-state">Loading distribution schedule...</td></tr>`;
         const params = new URLSearchParams();
         if (state.year) params.set("year", state.year);
         if (state.season) params.set("season", state.season);
@@ -26,7 +26,7 @@
                 return state.newestFirst ? -diff : diff;
             });
         } catch (error) {
-            if (body) body.innerHTML = `<tr><td colspan="9" class="empty-state">${escapeHtml(error.message)}</td></tr>`;
+            if (body) body.innerHTML = `<tr><td colspan="10" class="empty-state">${escapeHtml(error.message)}</td></tr>`;
             return;
         }
         renderTable();
@@ -36,7 +36,7 @@
         const body = document.getElementById("scheduleTableBody");
         if (!body) return;
         if (!rows.length) {
-            body.innerHTML = `<tr><td colspan="9" class="empty-state"><i class="bi bi-inbox"></i>No distribution records match these filters.</td></tr>`;
+            body.innerHTML = `<tr><td colspan="10" class="empty-state"><i class="bi bi-inbox"></i>No distribution records match these filters.</td></tr>`;
             return;
         }
         body.innerHTML = rows.map(row => {
@@ -46,6 +46,7 @@
                 <td class="tc"><span class="distribution-status-badge ${row.croppingSeason === "Wet" ? "status-pending" : "status-received"}"><span class="status-dot"></span>${escapeHtml(row.croppingSeason || "—")}</span></td>
                 <td class="tl">${escapeHtml(row.farmerName || "—")}</td>
                 <td class="tl">${escapeHtml(row.assistanceType || "Other")}</td>
+                <td class="tl col-text-wrap">${escapeHtml(row.itemName || "—")}</td>
                 <td class="tc">${escapeHtml(row.quantityDistributed ?? 0)}</td>
                 <td class="tc">${escapeHtml(row.farmerBeneficiaries ?? 0)}</td>
                 <td class="tl col-text-wrap">${escapeHtml(row.barangayCovered || "—")}</td>
@@ -78,8 +79,8 @@
                     <button class="btn btn-light" type="button" id="scheduleClear">Clear</button>
                 </form>
                 <div class="table-responsive"><table class="table align-middle mb-0">
-                    <thead><tr><th class="tl">Distribution date</th><th class="tc">Cropping season</th><th class="tl">Farmer name</th><th class="tl">Assistance type</th><th class="tc">Quantity distributed</th><th class="tc">Farmer beneficiaries</th><th class="tl">Barangay covered</th><th class="tc">Status</th><th class="tc">Actions</th></tr></thead>
-                    <tbody id="scheduleTableBody"><tr><td colspan="9" class="empty-state">Loading distribution schedule...</td></tr></tbody>
+                    <thead><tr><th class="tl">Distribution date</th><th class="tc">Cropping season</th><th class="tl">Farmer name</th><th class="tl">Assistance type</th><th class="tl">Item</th><th class="tc">Quantity distributed</th><th class="tc">Farmer beneficiaries</th><th class="tl">Barangay covered</th><th class="tc">Status</th><th class="tc">Actions</th></tr></thead>
+                    <tbody id="scheduleTableBody"><tr><td colspan="10" class="empty-state">Loading distribution schedule...</td></tr></tbody>
                 </table></div>
             </section>`;
         mainContent.appendChild(host);

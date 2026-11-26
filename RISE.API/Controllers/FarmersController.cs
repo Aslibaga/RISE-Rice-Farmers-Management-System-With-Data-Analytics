@@ -29,7 +29,6 @@ public class FarmersController : ControllerBase
         [FromQuery] string? name,
         [FromQuery] string? barangay,
         [FromQuery] string? municipality,
-        [FromQuery] string? association,
         [FromQuery] string? sort,
         [FromQuery] bool includeArchived = false,
         CancellationToken cancellationToken = default)
@@ -47,9 +46,7 @@ public class FarmersController : ControllerBase
                 farmer.FullName.Contains(search) ||
                 farmer.FarmerId.ToString() == search ||
                 (farmer.Barangay != null && farmer.Barangay.Contains(search)) ||
-                farmer.Municipality!.Contains(search) ||
-                (farmer.Association != null &&
-                 farmer.Association.Name.Contains(search)));
+                farmer.Municipality!.Contains(search));
         }
 
         if (!string.IsNullOrWhiteSpace(name))
@@ -70,13 +67,6 @@ public class FarmersController : ControllerBase
                 farmer.Municipality.Contains(municipality));
         }
 
-        if (!string.IsNullOrWhiteSpace(association))
-        {
-            query = query.Where(farmer =>
-                farmer.Association != null &&
-                farmer.Association.Name.Contains(association));
-        }
-
         query = sort switch
         {
             "newest" => query.OrderByDescending(farmer => farmer.FarmerId),
@@ -95,7 +85,6 @@ public class FarmersController : ControllerBase
                 farmer.Barangay,
                 farmer.Municipality,
                 farmer.Province,
-                farmer.Association == null ? null : farmer.Association.Name,
                 farmer.IsActive))
             .ToListAsync(cancellationToken);
 
@@ -138,7 +127,6 @@ public class FarmersController : ControllerBase
                 farmer.Barangay,
                 farmer.Municipality,
                 farmer.Province,
-                farmer.Association == null ? null : farmer.Association.Name,
                 farmer.IsActive))
             .ToListAsync(cancellationToken);
 
@@ -170,7 +158,6 @@ public class FarmersController : ControllerBase
                 entity.Barangay,
                 entity.Municipality,
                 entity.Province,
-                entity.Association == null ? null : entity.Association.Name,
                 entity.IsActive))
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -197,9 +184,6 @@ public class FarmersController : ControllerBase
                 "An active farmer with the same full name and contact number already exists.");
         }
 
-        var association = await FindOrCreateAssociationAsync(
-            request.AssociationName,
-            cancellationToken);
         var farmer = new Farmer
         {
             FullName = displayName,
@@ -210,7 +194,6 @@ public class FarmersController : ControllerBase
             Province = request.Province?.Trim(),
             Barangay = CleanOptionalValue(request.Barangay),
             Municipality = CleanOptionalValue(request.Municipality),
-            Association = association,
             IsActive = true
         };
 
@@ -264,11 +247,6 @@ public class FarmersController : ControllerBase
                 "Another active farmer with the same full name and contact number already exists.");
         }
 
-        if (!string.IsNullOrWhiteSpace(request.AssociationName))
-        {
-            farmer.Association = await FindOrCreateAssociationAsync(
-                request.AssociationName, cancellationToken);
-        }
         farmer.FullName = displayName;
         farmer.FirstName = request.FirstName?.Trim();
         farmer.LastName = request.LastName?.Trim();
@@ -334,7 +312,6 @@ public class FarmersController : ControllerBase
         CancellationToken cancellationToken)
     {
         var farmer = await _context.Farmers
-            .Include(entity => entity.Association)
             .FirstOrDefaultAsync(entity => entity.FarmerId == id, cancellationToken);
 
         if (farmer is null)
@@ -386,26 +363,7 @@ public class FarmersController : ControllerBase
             farmer.Barangay,
             farmer.Municipality,
             farmer.Province,
-            farmer.Association?.Name,
             farmer.IsActive);
-
-    private async Task<FarmerAssociation?> FindOrCreateAssociationAsync(
-        string? name,
-        CancellationToken cancellationToken)
-    {
-        var normalizedName = CleanOptionalValue(name);
-        if (normalizedName is null)
-        {
-            return null;
-        }
-
-        var existingAssociation = await _context.FarmerAssociations
-            .FirstOrDefaultAsync(
-                association => association.Name == normalizedName,
-                cancellationToken);
-
-        return existingAssociation ?? new FarmerAssociation { Name = normalizedName };
-    }
 
     private static string? CleanOptionalValue(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

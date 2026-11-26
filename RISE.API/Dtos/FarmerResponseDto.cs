@@ -10,5 +10,4 @@ public sealed record FarmerResponseDto(
     string? Barangay,
     string? Municipality,
     string? Province,
-    string? AssociationName,
     bool IsActive);

@@ -16,21 +16,13 @@ public class Farmer
 
     public string ContactNumber { get; set; } = string.Empty;
 
-    public string Address { get; set; } = string.Empty;
-
     public string? Barangay { get; set; }
 
     public string? Municipality { get; set; }
 
     public string? Province { get; set; }
 
-    public int? FarmerAssociationId { get; set; }
-
-    public FarmerAssociation? Association { get; set; }
-
     public bool IsActive { get; set; } = true;
-
-    public ICollection<Farm> Farms { get; set; } = new List<Farm>();
 
     public ICollection<Distribution> Distributions { get; set; } = new List<Distribution>();
 

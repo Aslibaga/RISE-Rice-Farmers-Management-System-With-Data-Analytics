@@ -59,7 +59,32 @@ public sealed class NotificationsController : ControllerBase
                     $"{item.Supply} for {item.Farmer} should be monitored by {item.Due:yyyy-MM-dd}.", false, DateTime.Today))
             .ToList();
 
-        return Ok(dynamicItems.Concat(stored).OrderByDescending(item => item.CreatedAtUtc).ToList());
+        var expiringSupplies = await _context.Supplies.AsNoTracking()
+            .Where(supply => supply.IsActive && supply.ExpirationDate != null && supply.StockQuantity > 0)
+            .Select(supply => new { supply.SupplyId, supply.Name, supply.ExpirationDate, supply.StockQuantity })
+            .ToListAsync(ct);
+        var expiryItems = expiringSupplies
+            .Select(supply =>
+            {
+                var expiryDate = DateOnly.FromDateTime(supply.ExpirationDate!.Value);
+                var days = expiryDate.DayNumber - today.DayNumber;
+                if (days > 30) return (NotificationDto?)null;
+                return new NotificationDto(
+                    -100000 - supply.SupplyId,
+                    days < 0 ? "ImportantAlert" : "SystemAnnouncement",
+                    days < 0 ? "Expired supply" : "Supply expiring soon",
+                    days < 0
+                        ? $"{supply.Name} expired on {expiryDate:yyyy-MM-dd}. {supply.StockQuantity} unit(s) still in stock."
+                        : $"{supply.Name} expires on {expiryDate:yyyy-MM-dd} ({days} day(s) left).",
+                    false,
+                    DateTime.Today);
+            })
+            .Where(item => item is not null)
+            .Select(item => item!)
+            .ToList();
+
+        return Ok(dynamicItems.Concat(expiryItems).Concat(stored)
+            .OrderByDescending(item => item.CreatedAtUtc).ToList());
     }
 
     [HttpPut("{id:int}/read")]

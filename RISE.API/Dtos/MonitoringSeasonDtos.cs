@@ -19,7 +19,6 @@ public sealed record SeasonHistoryDto(
     decimal ReceivedQuantity,
     decimal? QuantityUsed,
     decimal? QuantityStillStocked,
-    decimal? QuantityNotYetUsed,
     decimal? QuantityDisposed,
     DateOnly MonitoringDate,
     string? Remarks);

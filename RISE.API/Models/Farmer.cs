@@ -24,9 +24,9 @@ public class Farmer
 
     public bool IsActive { get; set; } = true;
 
-    public ICollection<Distribution> Distributions { get; set; } = new List<Distribution>();
+    public int OwnerUserId { get; set; }
 
-    public ICollection<SupportingDocument> SupportingDocuments { get; set; } = new List<SupportingDocument>();
+    public ICollection<Distribution> Distributions { get; set; } = new List<Distribution>();
 
     /// <summary>
     /// Builds the display name in "Last, First [Middle]" order. When there is no last name,

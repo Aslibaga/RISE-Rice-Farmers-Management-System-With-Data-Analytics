@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using RISE.API.Data;
 using RISE.API.Dtos;
 using RISE.API.Models;
+using RISE.API.Services;
 
 namespace RISE.API.Controllers;
 
@@ -12,6 +13,8 @@ namespace RISE.API.Controllers;
 [Authorize(Policy = "AnyAuthenticated")]
 public sealed class UtilizationController : ControllerBase
 {
+    private int OwnerId => OwnerScope.UserId(User);
+
     private readonly RiseDbContext _db;
     private readonly ILogger<UtilizationController> _logger;
     private readonly IConfiguration _configuration;
@@ -33,7 +36,7 @@ public sealed class UtilizationController : ControllerBase
         [FromQuery] string? barangay, CancellationToken ct)
     {
         var query = _db.DistributionItems.AsNoTracking()
-            .Where(item => item.Distribution.Status == "Distributed");
+            .Where(item => item.Distribution.Status == "Distributed" && item.Distribution.Farmer.OwnerUserId == OwnerId);
         if (!string.IsNullOrWhiteSpace(search))
             query = query.Where(item => item.Distribution.Farmer.FullName.Contains(search) ||
                 item.Supply.Name.Contains(search) ||
@@ -63,12 +66,12 @@ public sealed class UtilizationController : ControllerBase
         var result = rows.Select(row => {
             var m = row.Monitoring;
             var reported = (m?.QuantityUsed ?? 0) + (m?.QuantityStillStocked ?? 0) +
-                (m?.QuantityNotYetUsed ?? 0) + (m?.QuantityDisposed ?? 0);
+                (m?.QuantityDisposed ?? 0);
             return new UtilizationDto(m?.UtilizationMonitoringId ?? 0,
                 row.DistributionItemId, row.DistributionId, row.FarmerId, row.FarmerName,
                 row.FirstName, row.LastName, row.MiddleName,
                 row.Name, row.Unit, row.Received, m?.QuantityUsed, m?.QuantityStillStocked,
-                m?.QuantityNotYetUsed, m?.QuantityDisposed,
+                m?.QuantityDisposed,
                 Math.Max(0, row.Received - reported), m?.MonitoringDate ?? DateOnly.MinValue,
                 m?.Remarks, row.Category,
                 row.TargetMonitoringDate ?? row.DistributionDate.AddMonths(_configuration.GetValue<int>("Monitoring:TargetMonths", 3)));
@@ -86,13 +89,13 @@ public sealed class UtilizationController : ControllerBase
         CancellationToken ct)
     {
         var item = await _db.DistributionItems.Include(x => x.Distribution)
-            .FirstOrDefaultAsync(x => x.DistributionItemId == distributionItemId, ct);
+            .FirstOrDefaultAsync(x => x.DistributionItemId == distributionItemId && x.Distribution.Farmer.OwnerUserId == OwnerId, ct);
         if (item == null) return NotFound("Distribution item not found.");
         if (item.Distribution.Status != "Distributed")
             return Conflict("Utilization can only be recorded for assistance marked as Received.");
 
         var values = new[] { request.QuantityUsed, request.QuantityStillStocked,
-            request.QuantityNotYetUsed, request.QuantityDisposed };
+            request.QuantityDisposed };
         if (values.All(x => !x.HasValue))
             return BadRequest("Enter at least one utilization quantity.");
         var total = values.Sum(x => x ?? 0m);
@@ -102,7 +105,7 @@ public sealed class UtilizationController : ControllerBase
             return BadRequest("Utilization quantities cannot be negative.");
 
         var record = await _db.UtilizationMonitorings
-            .FirstOrDefaultAsync(x => x.DistributionItemId == distributionItemId, ct);
+            .FirstOrDefaultAsync(x => x.DistributionItemId == distributionItemId && x.DistributionItem.Distribution.Farmer.OwnerUserId == OwnerId, ct);
         if (record == null)
         {
             record = new UtilizationMonitoring { DistributionItemId = distributionItemId };
@@ -110,7 +113,6 @@ public sealed class UtilizationController : ControllerBase
         }
         record.QuantityUsed = request.QuantityUsed;
         record.QuantityStillStocked = request.QuantityStillStocked;
-        record.QuantityNotYetUsed = request.QuantityNotYetUsed;
         record.QuantityDisposed = request.QuantityDisposed;
         record.MonitoringDate = request.MonitoringDate == default
             ? DateOnly.FromDateTime(DateTime.Today) : request.MonitoringDate;

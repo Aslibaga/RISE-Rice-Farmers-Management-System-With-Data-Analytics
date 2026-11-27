@@ -39,7 +39,7 @@ public sealed class NotificationsController : ControllerBase
 
         var today = DateOnly.FromDateTime(DateTime.Today);
         var overdue = await _context.DistributionItems.AsNoTracking()
-            .Where(item => item.Distribution.Status == "Distributed" && item.UtilizationMonitoring == null)
+            .Where(item => item.Distribution.Status == "Distributed" && item.UtilizationMonitoring == null && item.Distribution.Farmer.OwnerUserId == userId)
             .Select(item => new
             {
                 item.DistributionItemId,
@@ -60,7 +60,7 @@ public sealed class NotificationsController : ControllerBase
             .ToList();
 
         var expiringSupplies = await _context.Supplies.AsNoTracking()
-            .Where(supply => supply.IsActive && supply.ExpirationDate != null && supply.StockQuantity > 0)
+            .Where(supply => supply.IsActive && supply.ExpirationDate != null && supply.StockQuantity > 0 && supply.OwnerUserId == userId)
             .Select(supply => new { supply.SupplyId, supply.Name, supply.ExpirationDate, supply.StockQuantity })
             .ToListAsync(ct);
         var expiryItems = expiringSupplies

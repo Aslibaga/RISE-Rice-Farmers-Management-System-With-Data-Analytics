@@ -2,68 +2,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace RISE.API.Dtos;
 
-public sealed record PlantingDto(
-    int PlantingRecordId,
-    string CropName,
-    string? Variety,
-    string? Season,
-    DateOnly PlantingDate,
-    decimal AreaPlantedHectares,
-    DateOnly? ExpectedHarvestDate,
-    string Status);
 
-public sealed class PlantingWriteDto
-{
-    [Required, StringLength(100)]
-    public string CropName { get; set; } = "Rice";
 
-    [StringLength(100)]
-    public string? Variety { get; set; }
 
-    [StringLength(50)]
-    public string? Season { get; set; }
-
-    public DateOnly PlantingDate { get; set; }
-
-    [Range(typeof(decimal), "0.0001", "99999999.9999")]
-    public decimal AreaPlantedHectares { get; set; }
-
-    public DateOnly? ExpectedHarvestDate { get; set; }
-
-    [Required, RegularExpression("^(Growing|Harvested|Failed|Cancelled)$")]
-    public string Status { get; set; } = "Growing";
-}
-
-public sealed record HarvestDto(
-    int HarvestRecordId,
-    int PlantingRecordId,
-    string CropName,
-    string FarmerName,
-    DateOnly HarvestDate,
-    decimal QuantityKilograms,
-    decimal? MoisturePercent,
-    string? Grade,
-    string? Notes);
-
-public sealed class HarvestWriteDto
-{
-    [Range(1, int.MaxValue)]
-    public int PlantingRecordId { get; set; }
-
-    public DateOnly HarvestDate { get; set; }
-
-    [Range(typeof(decimal), "0.001", "999999999999999.999")]
-    public decimal QuantityKilograms { get; set; }
-
-    [Range(typeof(decimal), "0", "100")]
-    public decimal? MoisturePercent { get; set; }
-
-    [StringLength(50)]
-    public string? Grade { get; set; }
-
-    [StringLength(2000)]
-    public string? Notes { get; set; }
-}
 
 public sealed record SupplyDto(
     int SupplyId,
@@ -120,36 +61,10 @@ public sealed class SupplyCategoryWriteDto
     public string? Description { get; set; }
 }
 
-public sealed record SupplierDto(
-    int SupplierId,
-    string Name,
-    string? ContactPerson,
-    string? PhoneNumber,
-    string? Email,
-    string? Address,
-    bool IsActive);
 
-public sealed class SupplierWriteDto
-{
-    [Required, StringLength(200, MinimumLength = 2)]
-    public string Name { get; set; } = string.Empty;
-
-    [StringLength(150)]
-    public string? ContactPerson { get; set; }
-
-    [StringLength(30)]
-    public string? PhoneNumber { get; set; }
-
-    [EmailAddress, StringLength(254)]
-    public string? Email { get; set; }
-
-    [StringLength(500)]
-    public string? Address { get; set; }
-}
 
 public sealed record SupplyOptionsDto(
-    IReadOnlyList<LookupDto> Categories,
-    IReadOnlyList<LookupDto> Suppliers);
+    IReadOnlyList<LookupDto> Categories);
 
 public sealed record LookupDto(int Id, string Name);
 
@@ -188,12 +103,6 @@ public sealed class DistributionItemWriteDto
     [Range(typeof(decimal), "0.001", "999999999999999.999")]
     public decimal Quantity { get; set; }
 
-    [Range(typeof(decimal), "0", "9999999999999999.99")]
-    public decimal UnitCost { get; set; }
-
-    [StringLength(100)]
-    public string? LotNumber { get; set; }
-
     public DateOnly? TargetMonitoringDate { get; set; }
 }
 
@@ -203,8 +112,6 @@ public sealed record DistributionItemDto(
     string SupplyName,
     string UnitOfMeasure,
     decimal Quantity,
-    decimal UnitCost,
-    string? LotNumber,
     DateOnly? TargetMonitoringDate);
 
 public sealed record DistributionDto(
@@ -268,8 +175,6 @@ public sealed record DashboardSummaryDto(
     int ActiveFarms,
     decimal TotalLandAreaHectares,
     int Associations,
-    int ActivePlantings,
-    decimal TotalHarvestKilograms,
     int ActiveSupplies,
     int OutOfStockSupplies,
     int Distributions,
@@ -278,14 +183,6 @@ public sealed record DashboardSummaryDto(
 
 public sealed record CountByNameDto(string Name, int Count);
 
-public sealed record ProductionReportDto(
-    int Year,
-    int Month,
-    string Municipality,
-    string CropName,
-    int HarvestRecordCount,
-    int FarmerCount,
-    decimal TotalHarvestKilograms);
 
 public sealed record DistributionReportDto(
     int Year,
@@ -293,5 +190,4 @@ public sealed record DistributionReportDto(
     string SupplyCategory,
     int DistributionCount,
     int FarmerCount,
-    decimal TotalQuantity,
-    decimal TotalValue);
+    decimal TotalQuantity);

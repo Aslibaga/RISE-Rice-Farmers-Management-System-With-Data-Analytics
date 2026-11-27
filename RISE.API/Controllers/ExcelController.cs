@@ -26,6 +26,8 @@ public sealed class ExcelController : ControllerBase
         "Unit Cost", "Stock Quantity", "Expiration Date"
     };
 
+    private int OwnerId => OwnerScope.UserId(User);
+
     private readonly RiseDbContext _context;
 
     public ExcelController(RiseDbContext context) => _context = context;
@@ -100,7 +102,7 @@ public sealed class ExcelController : ControllerBase
     [HttpGet("farmers/export")]
     public async Task<IActionResult> ExportFarmers([FromQuery] string? search, [FromQuery] string? sort, CancellationToken cancellationToken)
     {
-        var query = _context.Farmers.AsNoTracking().Where(farmer => farmer.IsActive);
+        var query = _context.Farmers.AsNoTracking().Where(farmer => farmer.IsActive && farmer.OwnerUserId == OwnerId);
         if (!string.IsNullOrWhiteSpace(search))
         {
             query = query.Where(farmer =>
@@ -189,7 +191,7 @@ public sealed class ExcelController : ControllerBase
             if (errors.Count == 0 && fullName.Length > 0 && contact.Length > 0)
             {
                 duplicate = await _context.Farmers.AsNoTracking().AnyAsync(
-                    farmer => farmer.IsActive && farmer.FullName == fullName && farmer.ContactNumber == contact, cancellationToken);
+                    farmer => farmer.OwnerUserId == OwnerId && farmer.IsActive && farmer.FullName == fullName && farmer.ContactNumber == contact, cancellationToken);
                 if (!duplicate) duplicate = !seen.Add($"{fullName}||{contact}");
             }
             var valid = errors.Count == 0 && !duplicate;
@@ -243,7 +245,7 @@ public sealed class ExcelController : ControllerBase
             if (rowErrors.Count > 0) { skipped++; errors.Add($"Row {index + 2}: {string.Join(" ", rowErrors)}"); continue; }
 
             var duplicate = await _context.Farmers.AsNoTracking().AnyAsync(
-                farmer => farmer.IsActive && farmer.FullName == fullName && farmer.ContactNumber == contact, cancellationToken);
+                farmer => farmer.OwnerUserId == OwnerId && farmer.IsActive && farmer.FullName == fullName && farmer.ContactNumber == contact, cancellationToken);
             if (duplicate || !seen.Add($"{fullName}||{contact}")) { skipped++; continue; }
 
             _context.Farmers.Add(new Farmer
@@ -256,7 +258,8 @@ public sealed class ExcelController : ControllerBase
                 Barangay = Null(Get(row, "Barangay")),
                 Municipality = Null(Get(row, "Municipality")),
                 Province = Null(Get(row, "Province")),
-                IsActive = true
+                IsActive = true,
+                OwnerUserId = OwnerId
             });
             inserted++;
         }
@@ -300,7 +303,7 @@ public sealed class ExcelController : ControllerBase
     [HttpGet("supplies/export")]
     public async Task<IActionResult> ExportSupplies([FromQuery] string? search, [FromQuery] string? sort, CancellationToken cancellationToken)
     {
-        var query = _context.Supplies.AsNoTracking().Where(supply => supply.IsActive);
+        var query = _context.Supplies.AsNoTracking().Where(supply => supply.IsActive && supply.OwnerUserId == OwnerId);
         if (!string.IsNullOrWhiteSpace(search))
             query = query.Where(supply => supply.Name.Contains(search) || supply.Category.Name.Contains(search));
         var supplies = await query.Select(supply => new
@@ -335,7 +338,7 @@ public sealed class ExcelController : ControllerBase
             supply.ExpirationDate, supply.CreatedAtUtc, supply.IsActive ? "Active" : "Archived"
         }).ToArray();
 
-        var categories = await _context.SupplyCategories.AsNoTracking()
+        var categories = await _context.SupplyCategories.AsNoTracking().Where(category => category.OwnerUserId == OwnerId)
             .Select(category => new { category.SupplyCategoryId, category.Name, category.Description, Count = category.Supplies.Count })
             .OrderBy(category => category.Name).ToListAsync(cancellationToken);
         var categorySheet = new XlsxService.Sheet
@@ -392,7 +395,7 @@ public sealed class ExcelController : ControllerBase
             if (errors.Count == 0)
             {
                 duplicate = await _context.Supplies.AsNoTracking().AnyAsync(
-                    supply => supply.IsActive && supply.Name == name && supply.Category.Name == category && supply.UnitOfMeasure == unit,
+                    supply => supply.OwnerUserId == OwnerId && supply.IsActive && supply.Name == name && supply.Category.Name == category && supply.UnitOfMeasure == unit,
                     cancellationToken);
                 if (!duplicate) duplicate = !seen.Add($"{name}||{category}||{unit}");
             }
@@ -457,10 +460,10 @@ public sealed class ExcelController : ControllerBase
 
             if (!categories.TryGetValue(categoryName, out var category))
             {
-                category = await _context.SupplyCategories.AsNoTracking().FirstOrDefaultAsync(item => item.Name == categoryName, cancellationToken);
+                category = await _context.SupplyCategories.AsNoTracking().FirstOrDefaultAsync(item => item.Name == categoryName && item.OwnerUserId == OwnerId, cancellationToken);
                 if (category is null)
                 {
-                    category = new SupplyCategory { Name = categoryName };
+                    category = new SupplyCategory { Name = categoryName, OwnerUserId = OwnerId };
                     _context.SupplyCategories.Add(category);
                 }
                 categories[categoryName] = category;
@@ -474,6 +477,7 @@ public sealed class ExcelController : ControllerBase
                 ExpirationDate = expiration.HasValue ? expiration.Value.ToDateTime(TimeOnly.MinValue) : null,
                 Category = category,
                 IsActive = true,
+                OwnerUserId = OwnerId,
                 CreatedAtUtc = DateTime.UtcNow
             });
             inserted++;
@@ -519,7 +523,7 @@ public sealed class ExcelController : ControllerBase
         {
             case "farmers":
             {
-                var farmers = await _context.Farmers.AsNoTracking().Where(farmer => farmer.IsActive)
+                var farmers = await _context.Farmers.AsNoTracking().Where(farmer => farmer.IsActive && farmer.OwnerUserId == OwnerId)
                     .OrderBy(farmer => farmer.FullName)
                     .Select(farmer => new object?[]
                     {
@@ -539,7 +543,7 @@ public sealed class ExcelController : ControllerBase
             }
             case "inventory":
             {
-                var supplies = await _context.Supplies.AsNoTracking().Where(supply => supply.IsActive)
+                var supplies = await _context.Supplies.AsNoTracking().Where(supply => supply.IsActive && supply.OwnerUserId == OwnerId)
                     .OrderBy(supply => supply.Name)
                     .Select(supply => new object?[]
                     {
@@ -553,14 +557,14 @@ public sealed class ExcelController : ControllerBase
             }
             case "distributions":
             {
-                var rows = await _context.DistributionItems.AsNoTracking()
+                var rows = await _context.DistributionItems.AsNoTracking().Where(item => item.Distribution.Farmer.OwnerUserId == OwnerId)
                     .OrderByDescending(item => item.Distribution.DistributionDate)
                     .Select(item => new object?[]
                     {
                         item.DistributionId, item.Distribution.ReferenceNumber, item.Distribution.DistributionDate,
                         item.Distribution.Status, item.Distribution.Farmer.FullName,
                         item.Distribution.Farmer.Barangay, item.Supply.Name, item.Supply.Category.Name,
-                        item.Quantity, item.Supply.UnitOfMeasure, item.LotNumber, item.TargetMonitoringDate
+                        item.Quantity, item.Supply.UnitOfMeasure, item.TargetMonitoringDate
                     }).ToArrayAsync(cancellationToken);
                 return Xlsx(XlsxService.Write(new[]
                 {
@@ -570,7 +574,7 @@ public sealed class ExcelController : ControllerBase
             case "usage":
             case "disposed":
             {
-                var query = _context.UtilizationMonitorings.AsNoTracking().AsQueryable();
+                var query = _context.UtilizationMonitorings.AsNoTracking().Where(record => record.DistributionItem.Distribution.Farmer.OwnerUserId == OwnerId).AsQueryable();
                 if (dataset.Equals("disposed", StringComparison.OrdinalIgnoreCase))
                     query = query.Where(record => record.QuantityDisposed > 0);
                 var rows = await query.OrderByDescending(record => record.MonitoringDate)
@@ -583,7 +587,6 @@ public sealed class ExcelController : ControllerBase
                         record.MonitoringDate,
                         record.QuantityUsed,
                         record.QuantityStillStocked,
-                        record.QuantityNotYetUsed,
                         record.QuantityDisposed,
                         record.DistributionItem.Supply.UnitOfMeasure,
                         record.Remarks
@@ -596,7 +599,7 @@ public sealed class ExcelController : ControllerBase
             }
             case "stock-summary":
             {
-                var supplies = await _context.Supplies.AsNoTracking().Where(supply => supply.IsActive)
+                var supplies = await _context.Supplies.AsNoTracking().Where(supply => supply.IsActive && supply.OwnerUserId == OwnerId)
                     .Select(supply => new { supply.Category.Name, supply.UnitOfMeasure, supply.StockQuantity })
                     .ToListAsync(cancellationToken);
                 var groups = supplies.GroupBy(supply => $"{supply.Name} ({supply.UnitOfMeasure})")
@@ -628,31 +631,31 @@ public sealed class ExcelController : ControllerBase
             case "full":
             {
                 var sheets = new List<XlsxService.Sheet>();
-                var inventory = await _context.Supplies.AsNoTracking().Where(supply => supply.IsActive)
+                var inventory = await _context.Supplies.AsNoTracking().Where(supply => supply.IsActive && supply.OwnerUserId == OwnerId)
                     .OrderBy(supply => supply.Name)
                     .Select(supply => new object?[] { supply.SupplyId, supply.Name, supply.Category.Name, supply.UnitOfMeasure, supply.StockQuantity, StockStatus(supply.StockQuantity), supply.ExpirationDate })
                     .ToArrayAsync(cancellationToken);
                 sheets.Add(new XlsxService.Sheet { Name = "Inventory", Columns = InventoryColumns(), Rows = inventory, Summary = $"Supplies: {inventory.Length}" });
-                var distributions = await _context.DistributionItems.AsNoTracking()
+                var distributions = await _context.DistributionItems.AsNoTracking().Where(item => item.Distribution.Farmer.OwnerUserId == OwnerId)
                     .Select(item => new object?[]
                     {
                         item.DistributionId, item.Distribution.ReferenceNumber, item.Distribution.DistributionDate,
                         item.Distribution.Status, item.Distribution.Farmer.FullName, item.Distribution.Farmer.Barangay,
                         item.Supply.Name, item.Supply.Category.Name, item.Quantity, item.Supply.UnitOfMeasure,
-                        item.LotNumber, item.TargetMonitoringDate
+                        item.TargetMonitoringDate
                     }).ToArrayAsync(cancellationToken);
                 sheets.Add(new XlsxService.Sheet { Name = "Distributions", Columns = DistributionColumns(), Rows = distributions, Summary = $"Distribution items: {distributions.Length}" });
-                var usage = await _context.UtilizationMonitorings.AsNoTracking()
+                var usage = await _context.UtilizationMonitorings.AsNoTracking().Where(record => record.DistributionItem.Distribution.Farmer.OwnerUserId == OwnerId)
                     .Select(record => new object?[]
                     {
                         record.DistributionItem.DistributionId, record.DistributionItem.Distribution.Farmer.FullName,
                         record.DistributionItem.Supply.Name, record.DistributionItem.Supply.Category.Name,
                         record.MonitoringDate, record.QuantityUsed, record.QuantityStillStocked,
-                        record.QuantityNotYetUsed, record.QuantityDisposed, record.DistributionItem.Supply.UnitOfMeasure,
+                        record.QuantityDisposed, record.DistributionItem.Supply.UnitOfMeasure,
                         record.Remarks
                     }).ToArrayAsync(cancellationToken);
                 sheets.Add(new XlsxService.Sheet { Name = "Usage", Columns = UsageColumns(), Rows = usage, Summary = $"Monitoring records: {usage.Length}" });
-                sheets.Add(new XlsxService.Sheet { Name = "Disposed Supplies", Columns = UsageColumns(), Rows = usage.Where(row => row[8] != null && Convert.ToDecimal(row[8]) > 0).ToArray(), Summary = "Only records with disposed quantity" });
+                sheets.Add(new XlsxService.Sheet { Name = "Disposed Supplies", Columns = UsageColumns(), Rows = usage.Where(row => row[7] != null && Convert.ToDecimal(row[7]) > 0).ToArray(), Summary = "Only records with disposed quantity" });
                 return Xlsx(XlsxService.Write(sheets, "RISE Supply Management Report", subtitle), "Supply_Management_Report.xlsx");
             }
             default:
@@ -694,7 +697,6 @@ public sealed class ExcelController : ControllerBase
         new XlsxService.Column { Header = "Category", Width = 18 },
         new XlsxService.Column { Header = "Quantity", Kind = XlsxService.CellKind.Number, Width = 14 },
         new XlsxService.Column { Header = "Unit", Width = 12 },
-        new XlsxService.Column { Header = "Lot No.", Width = 18 },
         new XlsxService.Column { Header = "Target Monitoring Date", Kind = XlsxService.CellKind.Date, Width = 22 }
     };
 
@@ -707,7 +709,6 @@ public sealed class ExcelController : ControllerBase
         new XlsxService.Column { Header = "Monitoring Date", Kind = XlsxService.CellKind.Date, Width = 18 },
         new XlsxService.Column { Header = "Used", Kind = XlsxService.CellKind.Number, Width = 14 },
         new XlsxService.Column { Header = "Still Stocked", Kind = XlsxService.CellKind.Number, Width = 16 },
-        new XlsxService.Column { Header = "Not Yet Used", Kind = XlsxService.CellKind.Number, Width = 16 },
         new XlsxService.Column { Header = "Disposed", Kind = XlsxService.CellKind.Number, Width = 14 },
         new XlsxService.Column { Header = "Unit", Width = 12 },
         new XlsxService.Column { Header = "Remarks", Width = 34 }

@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using RISE.API.Data;
 using RISE.API.Dtos;
 using RISE.API.Models;
+using RISE.API.Services;
 
 namespace RISE.API.Controllers;
 
@@ -14,6 +15,8 @@ namespace RISE.API.Controllers;
 [Authorize(Policy = "AnyAuthenticated")]
 public sealed class DistributionsController : ControllerBase
 {
+    private int OwnerId => OwnerScope.UserId(User);
+
     private readonly RiseDbContext _context;
     private readonly ILogger<DistributionsController> _logger;
     private readonly RISE.API.Services.NotificationService _notifications;
@@ -37,7 +40,7 @@ public sealed class DistributionsController : ControllerBase
         [FromQuery] int? farmerId, [FromQuery] string? barangay, [FromQuery] string? assistanceType,
         CancellationToken cancellationToken)
     {
-        var query = _context.Distributions.AsNoTracking().AsQueryable();
+        var query = _context.Distributions.AsNoTracking().Where(d => d.Farmer.OwnerUserId == OwnerId).AsQueryable();
         if (farmerId.HasValue) query = query.Where(d => d.FarmerId == farmerId.Value);
         if (!string.IsNullOrWhiteSpace(barangay))
             query = query.Where(d => d.Farmer.Barangay != null && d.Farmer.Barangay.Contains(barangay));
@@ -90,8 +93,7 @@ public sealed class DistributionsController : ControllerBase
                         item.Supply.Name,
                         item.Supply.UnitOfMeasure,
                         item.Quantity,
-                        item.UnitCost,
-                        item.LotNumber, item.TargetMonitoringDate))
+                        item.TargetMonitoringDate))
                     .ToList()))
             .ToListAsync(cancellationToken);
         return Ok(distributions);
@@ -103,7 +105,7 @@ public sealed class DistributionsController : ControllerBase
         CancellationToken cancellationToken)
     {
         var result = await _context.Distributions.AsNoTracking()
-            .Where(distribution => distribution.DistributionId == id)
+            .Where(distribution => distribution.DistributionId == id && distribution.Farmer.OwnerUserId == OwnerId)
             .Select(distribution => new DistributionDto(
                 distribution.DistributionId,
                 distribution.FarmerId,
@@ -124,8 +126,7 @@ public sealed class DistributionsController : ControllerBase
                         item.Supply.Name,
                         item.Supply.UnitOfMeasure,
                         item.Quantity,
-                        item.UnitCost,
-                        item.LotNumber, item.TargetMonitoringDate))
+                        item.TargetMonitoringDate))
                     .ToList()))
             .FirstOrDefaultAsync(cancellationToken);
         return result is null ? NotFound() : Ok(result);
@@ -141,7 +142,7 @@ public sealed class DistributionsController : ControllerBase
         var farmerIdSearch = ParseFarmerIdSearch(search);
         var farmers = _context.Farmers
             .AsNoTracking()
-            .Where(f => f.IsActive)
+            .Where(f => f.IsActive && f.OwnerUserId == OwnerId)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -160,7 +161,7 @@ public sealed class DistributionsController : ControllerBase
         var query = _context.Distributions
             .Include(d => d.Items).ThenInclude(i => i.Supply).ThenInclude(s => s.Category)
             .AsNoTracking()
-            .Where(d => d.Farmer.IsActive)
+            .Where(d => d.Farmer.IsActive && d.Farmer.OwnerUserId == OwnerId)
             .AsQueryable();
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -249,13 +250,13 @@ public sealed class DistributionsController : ControllerBase
     {
         var farmer = await _context.Farmers
             .AsNoTracking()
-            .FirstOrDefaultAsync(f => f.FarmerId == farmerId && f.IsActive, cancellationToken);
+            .FirstOrDefaultAsync(f => f.FarmerId == farmerId && f.OwnerUserId == OwnerId && f.IsActive, cancellationToken);
         if (farmer is null) return NotFound();
 
         var distributions = await _context.Distributions
             .Include(d => d.Items).ThenInclude(i => i.Supply).ThenInclude(s => s.Category)
             .AsNoTracking()
-            .Where(d => d.FarmerId == farmerId)
+            .Where(d => d.FarmerId == farmerId && d.Farmer.OwnerUserId == OwnerId)
             .OrderByDescending(d => d.DistributionDate)
             .ThenByDescending(d => d.DistributionId)
             .ToListAsync(cancellationToken);
@@ -332,12 +333,11 @@ public sealed class DistributionsController : ControllerBase
             Status = "Distributed",
             Notes = Clean(request.Notes),
             ReferenceNumber = $"RISE-{Guid.NewGuid():N}".ToUpperInvariant()[..17],
+            CreatedByUserId = OwnerId,
             Items = request.Items.Select(item => new DistributionItem
             {
                 SupplyId = item.SupplyId,
                 Quantity = item.Quantity,
-                UnitCost = item.UnitCost,
-                LotNumber = Clean(item.LotNumber),
                 TargetMonitoringDate = item.TargetMonitoringDate
             }).ToList()
         };
@@ -362,6 +362,7 @@ public sealed class DistributionsController : ControllerBase
             var deducted = await _context.Supplies
                 .Where(supply => supply.SupplyId == item.SupplyId &&
                                  supply.IsActive &&
+                                 supply.OwnerUserId == OwnerId &&
                                  supply.StockQuantity >= item.Quantity)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(
                     supply => supply.StockQuantity,
@@ -380,11 +381,11 @@ public sealed class DistributionsController : ControllerBase
         await transaction.CommitAsync(cancellationToken);
         var lowStock = await _context.Supplies.AsNoTracking()
             .Where(supply => request.Items.Select(item => item.SupplyId).Contains(supply.SupplyId) &&
-                supply.IsActive && supply.StockQuantity <= 10)
+                supply.IsActive && supply.OwnerUserId == OwnerId && supply.StockQuantity <= 10)
             .Select(supply => supply.Name).ToListAsync(cancellationToken);
         if (lowStock.Count > 0)
             await _notifications.PublishAsync("ImportantAlert", "Low stock alert",
-                $"Stock is low after this distribution: {string.Join(", ", lowStock)}.", cancellationToken);
+                $"Stock is low after this distribution: {string.Join(", ", lowStock)}.", cancellationToken, OwnerId);
         var result = await GetDistribution(distribution.DistributionId, cancellationToken);
         return CreatedAtAction(
             nameof(GetDistribution),
@@ -400,7 +401,7 @@ public sealed class DistributionsController : ControllerBase
     {
         var distribution = await _context.Distributions
             .Include(item => item.Items)
-            .FirstOrDefaultAsync(item => item.DistributionId == id, cancellationToken);
+            .FirstOrDefaultAsync(item => item.DistributionId == id && item.Farmer.OwnerUserId == OwnerId, cancellationToken);
         if (distribution is null)
         {
             return NotFound();
@@ -433,8 +434,6 @@ public sealed class DistributionsController : ControllerBase
             DistributionId = id,
             SupplyId = item.SupplyId,
             Quantity = item.Quantity,
-            UnitCost = item.UnitCost,
-            LotNumber = Clean(item.LotNumber),
             TargetMonitoringDate = item.TargetMonitoringDate
         }).ToList();
         try
@@ -459,7 +458,7 @@ public sealed class DistributionsController : ControllerBase
     {
         var distribution = await _context.Distributions
             .Include(item => item.Items)
-            .FirstOrDefaultAsync(item => item.DistributionId == id, cancellationToken);
+            .FirstOrDefaultAsync(item => item.DistributionId == id && item.Farmer.OwnerUserId == OwnerId, cancellationToken);
         if (distribution is null)
         {
             return NotFound();
@@ -497,7 +496,7 @@ public sealed class DistributionsController : ControllerBase
     {
         var distribution = await _context.Distributions
             .Include(item => item.Items)
-            .FirstOrDefaultAsync(item => item.DistributionId == id, cancellationToken);
+            .FirstOrDefaultAsync(item => item.DistributionId == id && item.Farmer.OwnerUserId == OwnerId, cancellationToken);
         if (distribution is null)
         {
             return NotFound();
@@ -525,7 +524,7 @@ public sealed class DistributionsController : ControllerBase
         var distribution = await _context.Distributions
             .Include(item => item.Items)
             .ThenInclude(item => item.Supply)
-            .FirstOrDefaultAsync(item => item.DistributionId == id, cancellationToken);
+            .FirstOrDefaultAsync(item => item.DistributionId == id && item.Farmer.OwnerUserId == OwnerId, cancellationToken);
         if (distribution is null) return NotFound();
         if (distribution.Status != "Draft" && distribution.Status != "Approved")
             return Conflict("Only pending distributions can be marked as received.");
@@ -563,7 +562,7 @@ public sealed class DistributionsController : ControllerBase
         CancellationToken cancellationToken)
     {
         var distribution = await _context.Distributions.FirstOrDefaultAsync(
-            item => item.DistributionId == id, cancellationToken);
+            item => item.DistributionId == id && item.Farmer.OwnerUserId == OwnerId, cancellationToken);
         if (distribution is null)
         {
             return NotFound();
@@ -587,7 +586,7 @@ public sealed class DistributionsController : ControllerBase
         CancellationToken cancellationToken)
     {
         if (!await _context.Farmers.AnyAsync(
-                farmer => farmer.FarmerId == request.FarmerId && farmer.IsActive,
+                farmer => farmer.FarmerId == request.FarmerId && farmer.OwnerUserId == OwnerId && farmer.IsActive,
                 cancellationToken))
         {
             return "Select an active farmer.";
@@ -606,7 +605,7 @@ public sealed class DistributionsController : ControllerBase
         }
         var supplyIds = request.Items.Select(item => item.SupplyId).Distinct().ToArray();
         var activeSupplyCount = await _context.Supplies.CountAsync(
-            supply => supply.IsActive && supplyIds.Contains(supply.SupplyId),
+            supply => supply.IsActive && supply.OwnerUserId == OwnerId && supplyIds.Contains(supply.SupplyId),
             cancellationToken);
         return activeSupplyCount == supplyIds.Length
             ? null

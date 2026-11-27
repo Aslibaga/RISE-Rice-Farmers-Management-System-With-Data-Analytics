@@ -16,7 +16,6 @@ public sealed record UtilizationDto(
     decimal ReceivedQuantity,
     decimal? QuantityUsed,
     decimal? QuantityStillStocked,
-    decimal? QuantityNotYetUsed,
     decimal? QuantityDisposed,
     decimal UnreportedQuantity,
     DateOnly MonitoringDate,
@@ -30,8 +29,6 @@ public sealed class UtilizationWriteDto
     public decimal? QuantityUsed { get; set; }
     [Range(typeof(decimal), "0", "999999999999999.999")]
     public decimal? QuantityStillStocked { get; set; }
-    [Range(typeof(decimal), "0", "999999999999999.999")]
-    public decimal? QuantityNotYetUsed { get; set; }
     [Range(typeof(decimal), "0", "999999999999999.999")]
     public decimal? QuantityDisposed { get; set; }
     public DateOnly MonitoringDate { get; set; }

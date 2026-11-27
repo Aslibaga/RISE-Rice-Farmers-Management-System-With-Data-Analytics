@@ -171,13 +171,6 @@ static void SeedDatabase(IServiceProvider serviceProvider)
             context.SupplyCategories.Add(category);
             context.SaveChanges();
         }
-        var supplier = context.Suppliers.FirstOrDefault(s => s.Name == "RISE Default Supplier");
-        if (supplier is null)
-        {
-            supplier = new Supplier { Name = "RISE Default Supplier", IsActive = true };
-            context.Suppliers.Add(supplier);
-            context.SaveChanges();
-        }
         context.Supplies.Add(new Supply { Name = "Certified Rice Seeds", UnitOfMeasure = "kg", UnitCost = 45.00m, StockQuantity = 1000, SupplyCategoryId = category.SupplyCategoryId, IsActive = true });
         context.Supplies.Add(new Supply { Name = "Urea Fertilizer", UnitOfMeasure = "bag", UnitCost = 1200.00m, StockQuantity = 500, SupplyCategoryId = category.SupplyCategoryId, IsActive = true });
         context.SaveChanges();
@@ -200,5 +193,16 @@ static void SeedDatabase(IServiceProvider serviceProvider)
 
         context.UserRoles.Add(new UserRole { UserId = adminUser.UserId, RoleId = adminRole.RoleId, AssignedAtUtc = DateTime.UtcNow });
         context.SaveChanges();
+    }
+
+    // Assign any legacy/seeded records to the administrator account.
+    var adminId = context.Users
+        .Where(u => u.UserRoles.Any(ur => ur.Role.Name == "Administrator"))
+        .Select(u => u.UserId).FirstOrDefault();
+    if (adminId > 0)
+    {
+        context.Farmers.Where(f => f.OwnerUserId == 0).ExecuteUpdate(f => f.SetProperty(x => x.OwnerUserId, adminId));
+        context.Supplies.Where(s => s.OwnerUserId == 0).ExecuteUpdate(s => s.SetProperty(x => x.OwnerUserId, adminId));
+        context.SupplyCategories.Where(c => c.OwnerUserId == 0).ExecuteUpdate(c => c.SetProperty(x => x.OwnerUserId, adminId));
     }
 }

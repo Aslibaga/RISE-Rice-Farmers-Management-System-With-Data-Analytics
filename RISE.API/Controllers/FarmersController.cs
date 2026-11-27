@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using RISE.API.Data;
 using RISE.API.Dtos;
 using RISE.API.Models;
+using RISE.API.Services;
 
 namespace RISE.API.Controllers;
 
@@ -12,6 +13,8 @@ namespace RISE.API.Controllers;
 [Authorize(Policy = "AnyAuthenticated")]
 public class FarmersController : ControllerBase
 {
+    private int OwnerId => OwnerScope.UserId(User);
+
     private readonly RiseDbContext _context;
     private readonly ILogger<FarmersController> _logger;
 
@@ -33,7 +36,7 @@ public class FarmersController : ControllerBase
         [FromQuery] bool includeArchived = false,
         CancellationToken cancellationToken = default)
     {
-        var query = _context.Farmers.AsNoTracking().AsQueryable();
+        var query = _context.Farmers.AsNoTracking().Where(farmer => farmer.OwnerUserId == OwnerId).AsQueryable();
 
         if (!includeArchived)
         {
@@ -108,7 +111,7 @@ public class FarmersController : ControllerBase
 
         var farmers = await _context.Farmers
             .AsNoTracking()
-            .Where(farmer => farmer.IsActive && (
+            .Where(farmer => farmer.OwnerUserId == OwnerId && farmer.IsActive && (
                 (farmer.FirstName != null && farmer.FirstName.Contains(term)) ||
                 (farmer.LastName != null && farmer.LastName.Contains(term)) ||
                 (farmer.MiddleName != null && farmer.MiddleName.Contains(term)) ||
@@ -140,7 +143,7 @@ public class FarmersController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var query = _context.Farmers.AsNoTracking()
-            .Where(farmer => farmer.FarmerId == id);
+            .Where(farmer => farmer.FarmerId == id && farmer.OwnerUserId == OwnerId);
 
         if (!includeArchived)
         {
@@ -173,7 +176,7 @@ public class FarmersController : ControllerBase
             request.FirstName, request.LastName, request.MiddleName, request.FullName);
 
         var duplicate = await _context.Farmers.AsNoTracking().AnyAsync(
-            farmer => farmer.IsActive &&
+            farmer => farmer.OwnerUserId == OwnerId && farmer.IsActive &&
                 farmer.FullName == displayName &&
                 farmer.ContactNumber == request.ContactNumber.Trim(),
             cancellationToken);
@@ -194,7 +197,8 @@ public class FarmersController : ControllerBase
             Province = request.Province?.Trim(),
             Barangay = CleanOptionalValue(request.Barangay),
             Municipality = CleanOptionalValue(request.Municipality),
-            IsActive = true
+            IsActive = true,
+            OwnerUserId = OwnerId
         };
 
         _context.Farmers.Add(farmer);
@@ -235,7 +239,7 @@ public class FarmersController : ControllerBase
             request.FirstName, request.LastName, request.MiddleName, request.FullName);
 
         var duplicate = await _context.Farmers.AsNoTracking().AnyAsync(
-            existing => existing.IsActive &&
+            existing => existing.OwnerUserId == OwnerId && existing.IsActive &&
                 existing.FarmerId != id &&
                 existing.FullName == displayName &&
                 existing.ContactNumber == request.ContactNumber.Trim(),
@@ -277,7 +281,7 @@ public class FarmersController : ControllerBase
         CancellationToken cancellationToken)
     {
         var farmer = await _context.Farmers
-            .FirstOrDefaultAsync(entity => entity.FarmerId == id, cancellationToken);
+            .FirstOrDefaultAsync(entity => entity.FarmerId == id && entity.OwnerUserId == OwnerId, cancellationToken);
 
         if (farmer is null)
         {
@@ -312,7 +316,7 @@ public class FarmersController : ControllerBase
         CancellationToken cancellationToken)
     {
         var farmer = await _context.Farmers
-            .FirstOrDefaultAsync(entity => entity.FarmerId == id, cancellationToken);
+            .FirstOrDefaultAsync(entity => entity.FarmerId == id && entity.OwnerUserId == OwnerId, cancellationToken);
 
         if (farmer is null)
         {
@@ -320,7 +324,7 @@ public class FarmersController : ControllerBase
         }
 
         var duplicate = await _context.Farmers.AsNoTracking().AnyAsync(
-            existing => existing.IsActive &&
+            existing => existing.OwnerUserId == OwnerId && existing.IsActive &&
                 existing.FarmerId != id &&
                 existing.FullName == farmer.FullName &&
                 existing.ContactNumber == farmer.ContactNumber,

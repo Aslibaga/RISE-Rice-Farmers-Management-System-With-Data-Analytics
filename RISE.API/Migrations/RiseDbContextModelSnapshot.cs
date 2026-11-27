@@ -16,7 +16,7 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261126134741_RemoveFarmerAddress";
+    public override string LastMigrationId => "20261127124839_AddAccountOwnership";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -66,10 +66,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("int");
 
                 SqlServerPropertyBuilderExtensions.UseIdentityColumn(assistanceProgramId);
-
-                b.Property<string>("Description")
-                    .HasMaxLength(2000)
-                    .HasColumnType("nvarchar(2000)");
 
                 b.Property<DateOnly?>("EndDate")
                     .HasColumnType("date");
@@ -149,58 +145,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                 b.ToTable("AuditLogs");
             });
 
-        modelBuilder.Entity("RISE.API.Models.CropMonitoringRecord", b =>
-            {
-                var cropMonitoringRecordId = b.Property<int>("CropMonitoringRecordId")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("int");
-
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(cropMonitoringRecordId);
-
-                b.Property<string>("CropHealth")
-                    .HasMaxLength(100)
-                    .HasColumnType("nvarchar(100)");
-
-                b.Property<string>("GrowthStage")
-                    .IsRequired()
-                    .HasMaxLength(100)
-                    .HasColumnType("nvarchar(100)");
-
-                b.Property<string>("Notes")
-                    .HasMaxLength(2000)
-                    .HasColumnType("nvarchar(2000)");
-
-                b.Property<DateTime>("ObservedAtUtc")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("datetime2")
-                    .HasDefaultValueSql("SYSUTCDATETIME()");
-
-                b.Property<string>("PestOrDisease")
-                    .HasMaxLength(500)
-                    .HasColumnType("nvarchar(500)");
-
-                b.Property<int>("PlantingRecordId")
-                    .HasColumnType("int");
-
-                b.Property<decimal?>("RainfallMillimeters")
-                    .HasPrecision(10, 2)
-                    .HasColumnType("decimal(10,2)");
-
-                b.Property<int?>("RecordedByUserId")
-                    .HasColumnType("int");
-
-                b.HasKey("CropMonitoringRecordId");
-
-                b.HasIndex("RecordedByUserId");
-
-                b.HasIndex("PlantingRecordId", "ObservedAtUtc");
-
-                b.ToTable("CropMonitoringRecords", t =>
-                    {
-                        t.HasCheckConstraint("CK_CropMonitoringRecords_Rainfall_NonNegative", "[RainfallMillimeters] IS NULL OR [RainfallMillimeters] >= 0");
-                    });
-            });
-
         modelBuilder.Entity("RISE.API.Models.Distribution", b =>
             {
                 var distributionId = b.Property<int>("DistributionId")
@@ -272,10 +216,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                 b.Property<int>("DistributionId")
                     .HasColumnType("int");
 
-                b.Property<string>("LotNumber")
-                    .HasMaxLength(100)
-                    .HasColumnType("nvarchar(100)");
-
                 b.Property<decimal>("Quantity")
                     .HasPrecision(18, 3)
                     .HasColumnType("decimal(18,3)");
@@ -285,10 +225,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
 
                 b.Property<DateOnly?>("TargetMonitoringDate")
                     .HasColumnType("date");
-
-                b.Property<decimal>("UnitCost")
-                    .HasPrecision(18, 2)
-                    .HasColumnType("decimal(18,2)");
 
                 b.HasKey("DistributionItemId");
 
@@ -300,8 +236,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                 b.ToTable("DistributionItems", t =>
                     {
                         t.HasCheckConstraint("CK_DistributionItems_Quantity_Positive", "[Quantity] > 0");
-
-                        t.HasCheckConstraint("CK_DistributionItems_UnitCost_NonNegative", "[UnitCost] >= 0");
                     });
             });
 
@@ -348,6 +282,9 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                     .HasMaxLength(100)
                     .HasColumnType("nvarchar(100)");
 
+                b.Property<int>("OwnerUserId")
+                    .HasColumnType("int");
+
                 b.Property<string>("Province")
                     .HasMaxLength(100)
                     .HasColumnType("nvarchar(100)");
@@ -362,103 +299,13 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
 
                 b.HasIndex("Municipality");
 
-                b.HasIndex("FullName", "ContactNumber")
+                b.HasIndex("OwnerUserId");
+
+                b.HasIndex("FullName", "ContactNumber", "OwnerUserId")
                     .IsUnique()
                     .HasFilter("[IsActive] = 1");
 
                 b.ToTable("Farmers");
-            });
-
-        modelBuilder.Entity("RISE.API.Models.HarvestRecord", b =>
-            {
-                var harvestRecordId = b.Property<int>("HarvestRecordId")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("int");
-
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(harvestRecordId);
-
-                b.Property<string>("Grade")
-                    .HasMaxLength(50)
-                    .HasColumnType("nvarchar(50)");
-
-                b.Property<DateOnly>("HarvestDate")
-                    .HasColumnType("date");
-
-                b.Property<decimal?>("MoisturePercent")
-                    .HasPrecision(5, 2)
-                    .HasColumnType("decimal(5,2)");
-
-                b.Property<string>("Notes")
-                    .HasMaxLength(2000)
-                    .HasColumnType("nvarchar(2000)");
-
-                b.Property<int>("PlantingRecordId")
-                    .HasColumnType("int");
-
-                b.Property<decimal>("QuantityKilograms")
-                    .HasPrecision(18, 3)
-                    .HasColumnType("decimal(18,3)");
-
-                b.HasKey("HarvestRecordId");
-
-                b.HasIndex("HarvestDate");
-
-                b.HasIndex("PlantingRecordId", "HarvestDate");
-
-                b.ToTable("HarvestRecords", t =>
-                    {
-                        t.HasCheckConstraint("CK_HarvestRecords_Moisture_Range", "[MoisturePercent] IS NULL OR ([MoisturePercent] >= 0 AND [MoisturePercent] <= 100)");
-
-                        t.HasCheckConstraint("CK_HarvestRecords_Quantity_Positive", "[QuantityKilograms] > 0");
-                    });
-            });
-
-        modelBuilder.Entity("RISE.API.Models.HarvestVerificationRecord", b =>
-            {
-                var harvestVerificationRecordId = b.Property<int>("HarvestVerificationRecordId")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("int");
-
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(harvestVerificationRecordId);
-
-                b.Property<int>("HarvestRecordId")
-                    .HasColumnType("int");
-
-                b.Property<string>("Remarks")
-                    .HasMaxLength(2000)
-                    .HasColumnType("nvarchar(2000)");
-
-                b.Property<string>("Status")
-                    .IsRequired()
-                    .ValueGeneratedOnAdd()
-                    .HasMaxLength(20)
-                    .HasColumnType("nvarchar(20)")
-                    .HasDefaultValue("Pending");
-
-                b.Property<DateTime>("VerifiedAtUtc")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("datetime2")
-                    .HasDefaultValueSql("SYSUTCDATETIME()");
-
-                b.Property<int?>("VerifiedByUserId")
-                    .HasColumnType("int");
-
-                b.Property<decimal?>("VerifiedQuantityKilograms")
-                    .HasPrecision(18, 3)
-                    .HasColumnType("decimal(18,3)");
-
-                b.HasKey("HarvestVerificationRecordId");
-
-                b.HasIndex("HarvestRecordId");
-
-                b.HasIndex("VerifiedByUserId");
-
-                b.ToTable("HarvestVerificationRecords", t =>
-                    {
-                        t.HasCheckConstraint("CK_HarvestVerificationRecords_Quantity_NonNegative", "[VerifiedQuantityKilograms] IS NULL OR [VerifiedQuantityKilograms] >= 0");
-
-                        t.HasCheckConstraint("CK_HarvestVerificationRecords_Status", "[Status] IN (N'Pending', N'Verified', N'Rejected')");
-                    });
             });
 
         modelBuilder.Entity("RISE.API.Models.Notification", b =>
@@ -537,65 +384,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                 b.ToTable("PasswordResetTokens");
             });
 
-        modelBuilder.Entity("RISE.API.Models.PlantingRecord", b =>
-            {
-                var plantingRecordId = b.Property<int>("PlantingRecordId")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("int");
-
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(plantingRecordId);
-
-                b.Property<decimal>("AreaPlantedHectares")
-                    .HasPrecision(12, 4)
-                    .HasColumnType("decimal(12,4)");
-
-                b.Property<string>("CropName")
-                    .IsRequired()
-                    .ValueGeneratedOnAdd()
-                    .HasMaxLength(100)
-                    .HasColumnType("nvarchar(100)")
-                    .HasDefaultValue("Rice");
-
-                b.Property<DateOnly?>("ExpectedHarvestDate")
-                    .HasColumnType("date");
-
-                b.Property<DateOnly>("PlantingDate")
-                    .HasColumnType("date");
-
-                b.Property<string>("Season")
-                    .HasMaxLength(50)
-                    .HasColumnType("nvarchar(50)");
-
-                b.Property<int?>("SeedDistributionItemId")
-                    .HasColumnType("int");
-
-                b.Property<string>("Status")
-                    .IsRequired()
-                    .ValueGeneratedOnAdd()
-                    .HasMaxLength(20)
-                    .HasColumnType("nvarchar(20)")
-                    .HasDefaultValue("Growing");
-
-                b.Property<string>("Variety")
-                    .HasMaxLength(100)
-                    .HasColumnType("nvarchar(100)");
-
-                b.HasKey("PlantingRecordId");
-
-                b.HasIndex("PlantingDate");
-
-                b.HasIndex("SeedDistributionItemId");
-
-                b.ToTable("PlantingRecords", t =>
-                    {
-                        t.HasCheckConstraint("CK_PlantingRecords_Area_Positive", "[AreaPlantedHectares] > 0");
-
-                        t.HasCheckConstraint("CK_PlantingRecords_ExpectedHarvest", "[ExpectedHarvestDate] IS NULL OR [ExpectedHarvestDate] >= [PlantingDate]");
-
-                        t.HasCheckConstraint("CK_PlantingRecords_Status", "[Status] IN (N'Growing', N'Harvested', N'Failed', N'Cancelled')");
-                    });
-            });
-
         modelBuilder.Entity("RISE.API.Models.Role", b =>
             {
                 var roleId = b.Property<int>("RoleId")
@@ -619,45 +407,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                     .IsUnique();
 
                 b.ToTable("Roles");
-            });
-
-        modelBuilder.Entity("RISE.API.Models.Supplier", b =>
-            {
-                var supplierId = b.Property<int>("SupplierId")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("int");
-
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(supplierId);
-
-                b.Property<string>("Address")
-                    .HasMaxLength(500)
-                    .HasColumnType("nvarchar(500)");
-
-                b.Property<string>("ContactPerson")
-                    .HasMaxLength(150)
-                    .HasColumnType("nvarchar(150)");
-
-                b.Property<string>("Email")
-                    .HasMaxLength(254)
-                    .HasColumnType("nvarchar(254)");
-
-                b.Property<bool>("IsActive")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("bit")
-                    .HasDefaultValue(true);
-
-                b.Property<string>("Name")
-                    .IsRequired()
-                    .HasMaxLength(200)
-                    .HasColumnType("nvarchar(200)");
-
-                b.Property<string>("PhoneNumber")
-                    .HasMaxLength(30)
-                    .HasColumnType("nvarchar(30)");
-
-                b.HasKey("SupplierId");
-
-                b.ToTable("Suppliers");
             });
 
         modelBuilder.Entity("RISE.API.Models.Supply", b =>
@@ -684,6 +433,9 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                     .HasMaxLength(200)
                     .HasColumnType("nvarchar(200)");
 
+                b.Property<int>("OwnerUserId")
+                    .HasColumnType("int");
+
                 b.Property<decimal>("StockQuantity")
                     .HasPrecision(18, 3)
                     .HasColumnType("decimal(18,3)");
@@ -701,6 +453,8 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("nvarchar(30)");
 
                 b.HasKey("SupplyId");
+
+                b.HasIndex("OwnerUserId");
 
                 b.HasIndex("SupplyCategoryId");
 
@@ -729,129 +483,17 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                     .HasMaxLength(100)
                     .HasColumnType("nvarchar(100)");
 
+                b.Property<int>("OwnerUserId")
+                    .HasColumnType("int");
+
                 b.HasKey("SupplyCategoryId");
 
-                b.HasIndex("Name")
+                b.HasIndex("OwnerUserId");
+
+                b.HasIndex("Name", "OwnerUserId")
                     .IsUnique();
 
                 b.ToTable("SupplyCategories");
-            });
-
-        modelBuilder.Entity("RISE.API.Models.SupplyUsageRecord", b =>
-            {
-                var supplyUsageRecordId = b.Property<int>("SupplyUsageRecordId")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("int");
-
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(supplyUsageRecordId);
-
-                b.Property<int?>("DistributionItemId")
-                    .HasColumnType("int");
-
-                b.Property<string>("Notes")
-                    .HasMaxLength(2000)
-                    .HasColumnType("nvarchar(2000)");
-
-                b.Property<int>("PlantingRecordId")
-                    .HasColumnType("int");
-
-                b.Property<decimal>("QuantityUsed")
-                    .HasPrecision(18, 3)
-                    .HasColumnType("decimal(18,3)");
-
-                b.Property<int?>("RecordedByUserId")
-                    .HasColumnType("int");
-
-                b.Property<int>("SupplyId")
-                    .HasColumnType("int");
-
-                b.Property<DateOnly>("UsageDate")
-                    .HasColumnType("date");
-
-                b.HasKey("SupplyUsageRecordId");
-
-                b.HasIndex("DistributionItemId");
-
-                b.HasIndex("RecordedByUserId");
-
-                b.HasIndex("SupplyId");
-
-                b.HasIndex("PlantingRecordId", "UsageDate");
-
-                b.ToTable("SupplyUsageRecords", t =>
-                    {
-                        t.HasCheckConstraint("CK_SupplyUsageRecords_Quantity_Positive", "[QuantityUsed] > 0");
-                    });
-            });
-
-        modelBuilder.Entity("RISE.API.Models.SupportingDocument", b =>
-            {
-                var supportingDocumentId = b.Property<int>("SupportingDocumentId")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("int");
-
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(supportingDocumentId);
-
-                b.Property<string>("ContentType")
-                    .IsRequired()
-                    .HasMaxLength(150)
-                    .HasColumnType("nvarchar(150)");
-
-                b.Property<int?>("DistributionId")
-                    .HasColumnType("int");
-
-                b.Property<int?>("FarmerId")
-                    .HasColumnType("int");
-
-                b.Property<string>("FileName")
-                    .IsRequired()
-                    .HasMaxLength(255)
-                    .HasColumnType("nvarchar(255)");
-
-                b.Property<long>("FileSizeBytes")
-                    .HasColumnType("bigint");
-
-                b.Property<int?>("HarvestRecordId")
-                    .HasColumnType("int");
-
-                b.Property<int?>("PlantingRecordId")
-                    .HasColumnType("int");
-
-                b.Property<string>("Sha256")
-                    .HasMaxLength(64)
-                    .HasColumnType("nvarchar(64)");
-
-                b.Property<string>("StoragePath")
-                    .IsRequired()
-                    .HasMaxLength(1000)
-                    .HasColumnType("nvarchar(1000)");
-
-                b.Property<DateTime>("UploadedAtUtc")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("datetime2")
-                    .HasDefaultValueSql("SYSUTCDATETIME()");
-
-                b.Property<int?>("UploadedByUserId")
-                    .HasColumnType("int");
-
-                b.HasKey("SupportingDocumentId");
-
-                b.HasIndex("DistributionId");
-
-                b.HasIndex("FarmerId");
-
-                b.HasIndex("HarvestRecordId");
-
-                b.HasIndex("PlantingRecordId");
-
-                b.HasIndex("UploadedByUserId");
-
-                b.ToTable("SupportingDocuments", t =>
-                    {
-                        t.HasCheckConstraint("CK_SupportingDocuments_FileSize_NonNegative", "[FileSizeBytes] >= 0");
-
-                        t.HasCheckConstraint("CK_SupportingDocuments_OneParent", "((CASE WHEN [FarmerId] IS NULL THEN 0 ELSE 1 END) + (CASE WHEN [DistributionId] IS NULL THEN 0 ELSE 1 END) + (CASE WHEN [PlantingRecordId] IS NULL THEN 0 ELSE 1 END) + (CASE WHEN [HarvestRecordId] IS NULL THEN 0 ELSE 1 END)) = 1");
-                    });
             });
 
         modelBuilder.Entity("RISE.API.Models.User", b =>
@@ -963,10 +605,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                     .HasPrecision(18, 3)
                     .HasColumnType("decimal(18,3)");
 
-                b.Property<decimal?>("QuantityNotYetUsed")
-                    .HasPrecision(18, 3)
-                    .HasColumnType("decimal(18,3)");
-
                 b.Property<decimal?>("QuantityStillStocked")
                     .HasPrecision(18, 3)
                     .HasColumnType("decimal(18,3)");
@@ -986,7 +624,7 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
 
                 b.ToTable("UtilizationMonitorings", t =>
                     {
-                        t.HasCheckConstraint("CK_UtilizationMonitoring_NonNegative", "([QuantityUsed] IS NULL OR [QuantityUsed] >= 0) AND ([QuantityStillStocked] IS NULL OR [QuantityStillStocked] >= 0) AND ([QuantityNotYetUsed] IS NULL OR [QuantityNotYetUsed] >= 0) AND ([QuantityDisposed] IS NULL OR [QuantityDisposed] >= 0)");
+                        t.HasCheckConstraint("CK_UtilizationMonitoring_NonNegative", "([QuantityUsed] IS NULL OR [QuantityUsed] >= 0) AND ([QuantityStillStocked] IS NULL OR [QuantityStillStocked] >= 0) AND ([QuantityDisposed] IS NULL OR [QuantityDisposed] >= 0)");
                     });
             });
 
@@ -1008,10 +646,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("date");
 
                 b.Property<decimal?>("QuantityDisposed")
-                    .HasPrecision(18, 3)
-                    .HasColumnType("decimal(18,3)");
-
-                b.Property<decimal?>("QuantityNotYetUsed")
                     .HasPrecision(18, 3)
                     .HasColumnType("decimal(18,3)");
 
@@ -1048,24 +682,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                     .OnDelete(DeleteBehavior.Restrict);
 
                 b.Navigation("User");
-            });
-
-        modelBuilder.Entity("RISE.API.Models.CropMonitoringRecord", b =>
-            {
-                b.HasOne("RISE.API.Models.PlantingRecord", "PlantingRecord")
-                    .WithMany("MonitoringRecords")
-                    .HasForeignKey("PlantingRecordId")
-                    .OnDelete(DeleteBehavior.Restrict)
-                    .IsRequired();
-
-                b.HasOne("RISE.API.Models.User", "RecordedByUser")
-                    .WithMany("CropMonitoringRecords")
-                    .HasForeignKey("RecordedByUserId")
-                    .OnDelete(DeleteBehavior.Restrict);
-
-                b.Navigation("PlantingRecord");
-
-                b.Navigation("RecordedByUser");
             });
 
         modelBuilder.Entity("RISE.API.Models.Distribution", b =>
@@ -1112,35 +728,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                 b.Navigation("Supply");
             });
 
-        modelBuilder.Entity("RISE.API.Models.HarvestRecord", b =>
-            {
-                b.HasOne("RISE.API.Models.PlantingRecord", "PlantingRecord")
-                    .WithMany("HarvestRecords")
-                    .HasForeignKey("PlantingRecordId")
-                    .OnDelete(DeleteBehavior.Restrict)
-                    .IsRequired();
-
-                b.Navigation("PlantingRecord");
-            });
-
-        modelBuilder.Entity("RISE.API.Models.HarvestVerificationRecord", b =>
-            {
-                b.HasOne("RISE.API.Models.HarvestRecord", "HarvestRecord")
-                    .WithMany("Verifications")
-                    .HasForeignKey("HarvestRecordId")
-                    .OnDelete(DeleteBehavior.Restrict)
-                    .IsRequired();
-
-                b.HasOne("RISE.API.Models.User", "VerifiedByUser")
-                    .WithMany("HarvestVerifications")
-                    .HasForeignKey("VerifiedByUserId")
-                    .OnDelete(DeleteBehavior.Restrict);
-
-                b.Navigation("HarvestRecord");
-
-                b.Navigation("VerifiedByUser");
-            });
-
         modelBuilder.Entity("RISE.API.Models.Notification", b =>
             {
                 b.HasOne("RISE.API.Models.User", "User")
@@ -1162,16 +749,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                 b.Navigation("User");
             });
 
-        modelBuilder.Entity("RISE.API.Models.PlantingRecord", b =>
-            {
-                b.HasOne("RISE.API.Models.DistributionItem", "SeedDistributionItem")
-                    .WithMany("PlantingRecords")
-                    .HasForeignKey("SeedDistributionItemId")
-                    .OnDelete(DeleteBehavior.Restrict);
-
-                b.Navigation("SeedDistributionItem");
-            });
-
         modelBuilder.Entity("RISE.API.Models.Supply", b =>
             {
                 b.HasOne("RISE.API.Models.SupplyCategory", "Category")
@@ -1181,77 +758,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                     .IsRequired();
 
                 b.Navigation("Category");
-            });
-
-        modelBuilder.Entity("RISE.API.Models.SupplyUsageRecord", b =>
-            {
-                b.HasOne("RISE.API.Models.DistributionItem", "DistributionItem")
-                    .WithMany("UsageRecords")
-                    .HasForeignKey("DistributionItemId")
-                    .OnDelete(DeleteBehavior.Restrict);
-
-                b.HasOne("RISE.API.Models.PlantingRecord", "PlantingRecord")
-                    .WithMany("SupplyUsageRecords")
-                    .HasForeignKey("PlantingRecordId")
-                    .OnDelete(DeleteBehavior.Restrict)
-                    .IsRequired();
-
-                b.HasOne("RISE.API.Models.User", "RecordedByUser")
-                    .WithMany("SupplyUsageRecords")
-                    .HasForeignKey("RecordedByUserId")
-                    .OnDelete(DeleteBehavior.Restrict);
-
-                b.HasOne("RISE.API.Models.Supply", "Supply")
-                    .WithMany("UsageRecords")
-                    .HasForeignKey("SupplyId")
-                    .OnDelete(DeleteBehavior.Restrict)
-                    .IsRequired();
-
-                b.Navigation("DistributionItem");
-
-                b.Navigation("PlantingRecord");
-
-                b.Navigation("RecordedByUser");
-
-                b.Navigation("Supply");
-            });
-
-        modelBuilder.Entity("RISE.API.Models.SupportingDocument", b =>
-            {
-                b.HasOne("RISE.API.Models.Distribution", "Distribution")
-                    .WithMany("SupportingDocuments")
-                    .HasForeignKey("DistributionId")
-                    .OnDelete(DeleteBehavior.Restrict);
-
-                b.HasOne("RISE.API.Models.Farmer", "Farmer")
-                    .WithMany("SupportingDocuments")
-                    .HasForeignKey("FarmerId")
-                    .OnDelete(DeleteBehavior.Restrict);
-
-                b.HasOne("RISE.API.Models.HarvestRecord", "HarvestRecord")
-                    .WithMany("SupportingDocuments")
-                    .HasForeignKey("HarvestRecordId")
-                    .OnDelete(DeleteBehavior.Restrict);
-
-                b.HasOne("RISE.API.Models.PlantingRecord", "PlantingRecord")
-                    .WithMany("SupportingDocuments")
-                    .HasForeignKey("PlantingRecordId")
-                    .OnDelete(DeleteBehavior.Restrict);
-
-                b.HasOne("RISE.API.Models.User", "UploadedByUser")
-                    .WithMany("SupportingDocuments")
-                    .HasForeignKey("UploadedByUserId")
-                    .OnDelete(DeleteBehavior.Restrict);
-
-                b.Navigation("Distribution");
-
-                b.Navigation("Farmer");
-
-                b.Navigation("HarvestRecord");
-
-                b.Navigation("PlantingRecord");
-
-                b.Navigation("UploadedByUser");
             });
 
         modelBuilder.Entity("RISE.API.Models.UserRole", b =>
@@ -1303,42 +809,16 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
         modelBuilder.Entity("RISE.API.Models.Distribution", b =>
             {
                 b.Navigation("Items");
-
-                b.Navigation("SupportingDocuments");
             });
 
         modelBuilder.Entity("RISE.API.Models.DistributionItem", b =>
             {
-                b.Navigation("PlantingRecords");
-
-                b.Navigation("UsageRecords");
-
                 b.Navigation("UtilizationMonitoring");
             });
 
         modelBuilder.Entity("RISE.API.Models.Farmer", b =>
             {
                 b.Navigation("Distributions");
-
-                b.Navigation("SupportingDocuments");
-            });
-
-        modelBuilder.Entity("RISE.API.Models.HarvestRecord", b =>
-            {
-                b.Navigation("SupportingDocuments");
-
-                b.Navigation("Verifications");
-            });
-
-        modelBuilder.Entity("RISE.API.Models.PlantingRecord", b =>
-            {
-                b.Navigation("HarvestRecords");
-
-                b.Navigation("MonitoringRecords");
-
-                b.Navigation("SupplyUsageRecords");
-
-                b.Navigation("SupportingDocuments");
             });
 
         modelBuilder.Entity("RISE.API.Models.Role", b =>
@@ -1349,8 +829,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
         modelBuilder.Entity("RISE.API.Models.Supply", b =>
             {
                 b.Navigation("DistributionItems");
-
-                b.Navigation("UsageRecords");
             });
 
         modelBuilder.Entity("RISE.API.Models.SupplyCategory", b =>
@@ -1363,14 +841,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                 b.Navigation("AuditLogs");
 
                 b.Navigation("CreatedDistributions");
-
-                b.Navigation("CropMonitoringRecords");
-
-                b.Navigation("HarvestVerifications");
-
-                b.Navigation("SupplyUsageRecords");
-
-                b.Navigation("SupportingDocuments");
 
                 b.Navigation("UserRoles");
             });

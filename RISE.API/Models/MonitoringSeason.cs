@@ -11,7 +11,6 @@ public class UtilizationSeasonRecord
     public int DistributionItemId { get; set; }
     public decimal? QuantityUsed { get; set; }
     public decimal? QuantityStillStocked { get; set; }
-    public decimal? QuantityNotYetUsed { get; set; }
     public decimal? QuantityDisposed { get; set; }
     public DateOnly MonitoringDate { get; set; }
     public string? Remarks { get; set; }

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using RISE.API.Data;
 using RISE.API.Dtos;
@@ -343,22 +344,17 @@ public class AuthController : ControllerBase
         if (user is null) return NotFound();
         if (!_passwordService.VerifyPassword(request.CurrentPassword, user.PasswordHash))
             return BadRequest("Current password is incorrect.");
-        // Delete all operational records so the new account starts fresh
-        await _context.Database.ExecuteSqlRawAsync("DELETE FROM DistributionItems", cancellationToken);
-        await _context.Database.ExecuteSqlRawAsync("DELETE FROM UtilizationMonitorings", cancellationToken);
-        await _context.Database.ExecuteSqlRawAsync("DELETE FROM HarvestVerificationRecords", cancellationToken);
-        await _context.Database.ExecuteSqlRawAsync("DELETE FROM HarvestRecords", cancellationToken);
-        await _context.Database.ExecuteSqlRawAsync("DELETE FROM SupplyUsageRecords", cancellationToken);
-        await _context.Database.ExecuteSqlRawAsync("DELETE FROM CropMonitoringRecords", cancellationToken);
-        await _context.Database.ExecuteSqlRawAsync("DELETE FROM PlantingRecords", cancellationToken);
-        await _context.Database.ExecuteSqlRawAsync("DELETE FROM Distributions", cancellationToken);
-        await _context.Database.ExecuteSqlRawAsync("DELETE FROM SupportingDocuments", cancellationToken);
-        await _context.Database.ExecuteSqlRawAsync("DELETE FROM Farmers", cancellationToken);
-        await _context.Database.ExecuteSqlRawAsync("DELETE FROM Supplies", cancellationToken);
-        await _context.Database.ExecuteSqlRawAsync("DELETE FROM SupplyCategories", cancellationToken);
-        await _context.Database.ExecuteSqlRawAsync("DELETE FROM Suppliers", cancellationToken);
-        await _context.Database.ExecuteSqlRawAsync("DELETE FROM AssistancePrograms", cancellationToken);
-        await _context.Database.ExecuteSqlRawAsync("DELETE FROM AuditLogs", cancellationToken);
+        // Delete only this account's records, in dependency order.
+        var owner = new object[] { new SqlParameter("@uid", userId) };
+        await _context.Database.ExecuteSqlRawAsync("DELETE FROM UtilizationSeasonRecords WHERE DistributionItemId IN (SELECT di.DistributionItemId FROM DistributionItems di INNER JOIN Distributions d ON di.DistributionId = d.DistributionId INNER JOIN Farmers f ON d.FarmerId = f.FarmerId WHERE f.OwnerUserId = @uid)", owner, cancellationToken);
+        await _context.Database.ExecuteSqlRawAsync("DELETE FROM UtilizationMonitorings WHERE DistributionItemId IN (SELECT di.DistributionItemId FROM DistributionItems di INNER JOIN Distributions d ON di.DistributionId = d.DistributionId INNER JOIN Farmers f ON d.FarmerId = f.FarmerId WHERE f.OwnerUserId = @uid)", owner, cancellationToken);
+        await _context.Database.ExecuteSqlRawAsync("DELETE FROM DistributionItems WHERE DistributionId IN (SELECT d.DistributionId FROM Distributions d INNER JOIN Farmers f ON d.FarmerId = f.FarmerId WHERE f.OwnerUserId = @uid)", owner, cancellationToken);
+        await _context.Database.ExecuteSqlRawAsync("DELETE FROM Distributions WHERE FarmerId IN (SELECT FarmerId FROM Farmers WHERE OwnerUserId = @uid)", owner, cancellationToken);
+        await _context.Database.ExecuteSqlRawAsync("DELETE FROM Farmers WHERE OwnerUserId = @uid", owner, cancellationToken);
+        await _context.Database.ExecuteSqlRawAsync("DELETE FROM Supplies WHERE OwnerUserId = @uid", owner, cancellationToken);
+        await _context.Database.ExecuteSqlRawAsync("DELETE FROM SupplyCategories WHERE OwnerUserId = @uid", owner, cancellationToken);
+        await _context.Database.ExecuteSqlRawAsync("DELETE FROM Notifications WHERE UserId = @uid", owner, cancellationToken);
+        await _context.Database.ExecuteSqlRawAsync("DELETE FROM AuditLogs WHERE UserId = @uid", owner, cancellationToken);
 
         // Remove user roles
         _context.UserRoles.RemoveRange(user.UserRoles);

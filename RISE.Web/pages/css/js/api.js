@@ -763,8 +763,6 @@ async function openDistributionModal(mode, id) {
             const items = rows.map(row => ({
                 supplyId: Number(row.querySelector('[name="supplyId"]').value),
                 quantity: Number(row.querySelector('[name="quantity"]').value),
-                unitCost: 0,
-                lotNumber: null,
                 targetMonitoringDate: `${row.querySelector('[name="targetYear"]').value}-${row.querySelector('[name="targetMonth"]').value}-01`
             }));
             if (new Set(items.map(item => item.supplyId)).size !== items.length) {
@@ -867,7 +865,6 @@ async function loadSeasonUtilizationRows() {
         date: dates.get(Number(row.distributionId)) || "—",
         used: row.quantityUsed,
         stocked: row.quantityStillStocked,
-        notUsed: row.quantityNotYetUsed,
         disposed: row.quantityDisposed
     })).sort((a, b) => String(b.date).localeCompare(String(a.date)));
 }
@@ -887,15 +884,6 @@ async function openStockedQuantityModal() {
             .filter(row => Number(row.stocked || 0) > 0)
             .map(row => ({ item: row.item, category: row.category, quantity: row.stocked, unit: row.unit, date: row.date }));
         openQuantityDetailsModal("Still Stocked", rows, "Quantity still stocked");
-    } catch (error) { showToast(error.message, "danger"); }
-}
-
-async function openNotUsedQuantityModal() {
-    try {
-        const rows = (await loadSeasonUtilizationRows())
-            .filter(row => Number(row.notUsed || 0) > 0)
-            .map(row => ({ item: row.item, category: row.category, quantity: row.notUsed, unit: row.unit, date: row.date }));
-        openQuantityDetailsModal("Total Quantity Not Yet Used", rows, "Quantity not yet used");
     } catch (error) { showToast(error.message, "danger"); }
 }
 
@@ -975,7 +963,7 @@ async function renderRiseDashboard() {
                 item.unitOfMeasure, item.quantity])));
         const usedByUnit = [], stockedByUnit = [], disposedByUnit = [];
         const seasonDistributionIds = new Set(allDistributions.filter(inSeason).map(row => Number(row.distributionId)));
-        let toMonitorFarmers = 0, overdueFarmers = 0, seasonStocked = 0, seasonDisposed = 0, seasonUsed = 0, seasonNotUsed = 0, seasonUnreported = 0, seasonRows = [];
+        let toMonitorFarmers = 0, overdueFarmers = 0, seasonStocked = 0, seasonDisposed = 0, seasonUsed = 0, seasonUnreported = 0, seasonRows = [];
         try {
             const utilizationRows = await api.get("/utilization") || [];
             const today = new Date().toISOString().slice(0, 10);
@@ -995,7 +983,6 @@ async function renderRiseDashboard() {
                 seasonDisposed += Number(row.quantityDisposed || 0);
                 seasonUsed += Number(row.quantityUsed || 0);
             });
-            seasonNotUsed = seasonRows.reduce((sum, row) => sum + Number(row.quantityNotYetUsed || 0), 0);
             seasonUnreported = seasonRows.reduce((sum, row) => sum + Number(row.unreportedQuantity || 0), 0);
         } catch {}
         const seasonTypeMap = new Map();
@@ -1042,7 +1029,6 @@ async function renderRiseDashboard() {
             const action = button.dataset.dashboardCard;
             if (action === "distributed") openDistributedQuantityModal();
             else if (action === "used") openUsedQuantityModal();
-            else if (action === "notused") openNotUsedQuantityModal();
             else if (action === "disposed") openDisposedQuantityModal();
             else if (action === "notreceived") openNotReceivedFarmersModal();
             else setView(action);
@@ -1379,19 +1365,18 @@ async function openUtilizationForm(r, onSaved) {
     <div class="modal-header"><h5 class="modal-title">Monitor ${escapeHtml(r.itemName)} — ${escapeHtml(r.farmerName)}</h5><button class="btn-close" type="button" data-bs-dismiss="modal"></button></div>
     <div class="modal-body"><p>Received: <strong>${r.receivedQuantity} ${escapeHtml(r.unit)}</strong>. The reported total cannot exceed this amount. Quantity used is required; still stocked and disposed are recorded as 0 when left blank.</p><div class="row g-3">
     ${[["quantityUsed","Quantity used *",true],["quantityStillStocked","Quantity still stocked",false],["quantityDisposed","Quantity disposed",false]].map(([n,l,required])=>`<div class="col-md-4"><label class="form-label">${l}</label><input class="form-control" name="${n}" type="number" min="0" max="${r.receivedQuantity}" step="0.001" value="${r[n]??""}"${required?" required":""}></div>`).join("")}
-    <input type="hidden" name="quantityNotYetUsed" value="${r.quantityNotYetUsed??""}">
     <div class="col-md-6"><label class="form-label">Monitoring date</label><input class="form-control" name="monitoringDate" type="date" value="${r.monitoringDate&&r.monitoringDate!=="0001-01-01"?r.monitoringDate:new Date().toISOString().slice(0,10)}" required></div>
     <div class="col-12"><label class="form-label">Remarks</label><textarea class="form-control" name="remarks" rows="2">${escapeHtml(r.remarks||"")}</textarea></div></div><div class="alert alert-info mt-3 mb-0" id="utilTotal"></div></div>
     <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-success">Save monitoring</button></div></form></div></div></div>`;
     document.body.appendChild(host);const modal=new bootstrap.Modal(host.querySelector(".modal"));modal.show();
     const form=host.querySelector("#utilForm");
-    const updateTotal=()=>{const sum=["quantityUsed","quantityStillStocked","quantityNotYetUsed","quantityDisposed"].reduce((a,n)=>a+(Number(form.elements[n].value)||0),0);host.querySelector("#utilTotal").textContent=`Reported total: ${sum} / ${r.receivedQuantity} ${r.unit} · Unreported: ${Math.max(0,r.receivedQuantity-sum)}`;return sum;};
+    const updateTotal=()=>{const sum=["quantityUsed","quantityStillStocked","quantityDisposed"].reduce((a,n)=>a+(Number(form.elements[n].value)||0),0);host.querySelector("#utilTotal").textContent=`Reported total: ${sum} / ${r.receivedQuantity} ${r.unit} · Unreported: ${Math.max(0,r.receivedQuantity-sum)}`;return sum;};
     form.addEventListener("input",updateTotal);updateTotal();
     form.addEventListener("submit",async e=>{e.preventDefault();
       if(form.elements.quantityUsed.value===""||Number(form.elements.quantityUsed.value)<0){showToast("Quantity used is required and must be 0 or above.","danger");return;}
       ["quantityStillStocked","quantityDisposed"].forEach(n=>{if(form.elements[n].value==="")form.elements[n].value="0";});
       const sum=updateTotal();if(sum>r.receivedQuantity){showToast("Reported quantities cannot exceed the received quantity.","danger");return;}
-      const payload={};["quantityUsed","quantityStillStocked","quantityNotYetUsed","quantityDisposed"].forEach(n=>payload[n]=form.elements[n].value===""?null:Number(form.elements[n].value));payload.monitoringDate=form.elements.monitoringDate.value;payload.remarks=form.elements.remarks.value.trim()||null;
+      const payload={};["quantityUsed","quantityStillStocked","quantityDisposed"].forEach(n=>payload[n]=form.elements[n].value===""?null:Number(form.elements[n].value));payload.monitoringDate=form.elements.monitoringDate.value;payload.remarks=form.elements.remarks.value.trim()||null;
       try{await api.put(`/utilization/${r.distributionItemId}`,payload);modal.hide();showToast("Utilization monitoring saved.");await renderUtilizationModule();if(typeof onSaved==="function") onSaved();}catch(err){showToast(err.message,"danger");}
     });
     host.querySelector(".modal").addEventListener("hidden.bs.modal",()=>host.remove());

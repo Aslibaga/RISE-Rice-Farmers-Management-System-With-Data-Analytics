@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using RISE.API.Data;
 using RISE.API.Dtos;
 using RISE.API.Models;
+using RISE.API.Services;
 
 namespace RISE.API.Controllers;
 
@@ -12,6 +13,8 @@ namespace RISE.API.Controllers;
 [Authorize(Policy = "AnyAuthenticated")]
 public sealed class MonitoringSeasonController : ControllerBase
 {
+    private int OwnerId => OwnerScope.UserId(User);
+
     private readonly RiseDbContext _context;
     private readonly RISE.API.Services.NotificationService _notifications;
 
@@ -81,10 +84,13 @@ public sealed class MonitoringSeasonController : ControllerBase
 
         await using var transaction = await _context.Database.BeginTransactionAsync(ct);
         var alreadyArchived = await _context.UtilizationSeasonRecords
-            .AnyAsync(record => record.SeasonKey == oldSeason, ct);
+            .AnyAsync(record => record.SeasonKey == oldSeason && record.DistributionItem.Distribution.Farmer.OwnerUserId == OwnerId, ct);
         if (!alreadyArchived)
         {
-            var openRecords = await _context.UtilizationMonitorings.AsNoTracking().ToListAsync(ct);
+            var openRecords = await _context.UtilizationMonitorings.AsNoTracking()
+                .Include(u => u.DistributionItem).ThenInclude(i => i.Distribution).ThenInclude(d => d.Farmer)
+                .Where(u => u.DistributionItem.Distribution.Farmer.OwnerUserId == OwnerId)
+                .ToListAsync(ct);
             foreach (var record in openRecords)
             {
                 _context.UtilizationSeasonRecords.Add(new UtilizationSeasonRecord
@@ -93,7 +99,6 @@ public sealed class MonitoringSeasonController : ControllerBase
                     DistributionItemId = record.DistributionItemId,
                     QuantityUsed = record.QuantityUsed,
                     QuantityStillStocked = record.QuantityStillStocked,
-                    QuantityNotYetUsed = record.QuantityNotYetUsed,
                     QuantityDisposed = record.QuantityDisposed,
                     MonitoringDate = record.MonitoringDate,
                     Remarks = record.Remarks,
@@ -122,7 +127,9 @@ public sealed class MonitoringSeasonController : ControllerBase
     [HttpGet("history")]
     public async Task<ActionResult<IReadOnlyList<SeasonHistoryDto>>> History([FromQuery] string? season, CancellationToken ct)
     {
-        var query = _context.UtilizationSeasonRecords.AsNoTracking().AsQueryable();
+        var query = _context.UtilizationSeasonRecords.AsNoTracking()
+            .Where(record => record.DistributionItem.Distribution.Farmer.OwnerUserId == OwnerId)
+            .AsQueryable();
         if (!string.IsNullOrWhiteSpace(season))
             query = query.Where(record => record.SeasonKey == season.Trim());
 
@@ -137,7 +144,6 @@ public sealed class MonitoringSeasonController : ControllerBase
                 record.DistributionItem.Quantity,
                 record.QuantityUsed,
                 record.QuantityStillStocked,
-                record.QuantityNotYetUsed,
                 record.QuantityDisposed,
                 record.MonitoringDate,
                 record.Remarks))
@@ -150,6 +156,7 @@ public sealed class MonitoringSeasonController : ControllerBase
         var active = await ActiveSeasonAsync(ct);
         var stored = await SettingAsync("SeasonHistory", "", ct);
         var archived = await _context.UtilizationSeasonRecords.AsNoTracking()
+            .Where(record => record.DistributionItem.Distribution.Farmer.OwnerUserId == OwnerId)
             .Select(record => record.SeasonKey).Distinct().ToListAsync(ct);
         return stored.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Concat(new[] { active }).Concat(archived)

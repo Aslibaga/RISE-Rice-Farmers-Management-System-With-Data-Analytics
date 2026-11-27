@@ -16,9 +16,11 @@ public sealed class NotificationService
         _db = db;
     }
 
-    public async Task PublishAsync(string type, string title, string message, CancellationToken ct = default)
+    public async Task PublishAsync(string type, string title, string message, CancellationToken ct = default, int? ownerUserId = null)
     {
-        var users = await _db.Users.AsNoTracking().Where(user => user.IsActive).ToListAsync(ct);
+        var users = await _db.Users.AsNoTracking()
+            .Where(user => user.IsActive && (!ownerUserId.HasValue || user.UserId == ownerUserId.Value))
+            .ToListAsync(ct);
         foreach (var user in users)
         {
             var enabled = type switch

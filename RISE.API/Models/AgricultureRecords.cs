@@ -26,7 +26,6 @@ public class Supply
     public int SupplyCategoryId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string UnitOfMeasure { get; set; } = string.Empty;
-    public decimal UnitCost { get; set; }
     public decimal StockQuantity { get; set; }
     public bool IsActive { get; set; } = true;
     public int OwnerUserId { get; set; }

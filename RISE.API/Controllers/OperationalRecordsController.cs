@@ -51,7 +51,7 @@ public sealed class OperationalRecordsController : ControllerBase
         return Ok(await query.OrderBy(supply => supply.Name)
             .Select(supply => new SupplyDto(
                 supply.SupplyId, supply.SupplyCategoryId, supply.Category.Name,
-                supply.Name, supply.UnitOfMeasure, supply.StockQuantity, supply.IsActive, supply.UnitCost,
+                supply.Name, supply.UnitOfMeasure, supply.StockQuantity, supply.IsActive,
                 supply.ExpirationDate))
             .ToListAsync(cancellationToken));
     }
@@ -109,7 +109,7 @@ public sealed class OperationalRecordsController : ControllerBase
             .Where(item => item.SupplyId == id && item.OwnerUserId == OwnerId)
             .Select(item => new SupplyDto(
                 item.SupplyId, item.SupplyCategoryId, item.Category.Name,
-                item.Name, item.UnitOfMeasure, item.StockQuantity, item.IsActive, item.UnitCost,
+                item.Name, item.UnitOfMeasure, item.StockQuantity, item.IsActive,
                 item.ExpirationDate))
             .FirstOrDefaultAsync(cancellationToken);
         return supply is null ? NotFound() : Ok(supply);
@@ -158,7 +158,6 @@ public sealed class OperationalRecordsController : ControllerBase
             SupplyCategoryId = categoryId,
             Name = request.Name.Trim(),
             UnitOfMeasure = request.UnitOfMeasure.Trim(),
-            UnitCost = request.UnitCost,
             StockQuantity = request.StockQuantity ?? 0m,
             ExpirationDate = request.ExpirationDate,
             IsActive = true,
@@ -212,7 +211,6 @@ public sealed class OperationalRecordsController : ControllerBase
 
         supply.Name = request.Name.Trim();
         supply.UnitOfMeasure = request.UnitOfMeasure.Trim();
-        supply.UnitCost = request.UnitCost;
         // Stock is managed through the Add Stock action; preserve it when the
         // edit payload omits the quantity.
         if (request.StockQuantity.HasValue)

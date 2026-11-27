@@ -74,14 +74,12 @@ public class RiseDbContext : DbContext
         {
             entity.Property(supply => supply.Name).HasMaxLength(200).IsRequired();
             entity.Property(supply => supply.UnitOfMeasure).HasMaxLength(30).IsRequired();
-            entity.Property(supply => supply.UnitCost).HasPrecision(18, 2);
             entity.Property(supply => supply.StockQuantity).HasPrecision(18, 3);
             entity.Property(supply => supply.IsActive).HasDefaultValue(true);
             entity.HasIndex(supply => supply.SupplyCategoryId);
             entity.HasIndex(supply => supply.OwnerUserId);
             entity.ToTable(table =>
             {
-                table.HasCheckConstraint("CK_Supplies_UnitCost_NonNegative", "[UnitCost] >= 0");
                 table.HasCheckConstraint("CK_Supplies_StockQuantity_NonNegative", "[StockQuantity] >= 0");
             });
             entity.HasOne(supply => supply.Category).WithMany(category => category.Supplies)

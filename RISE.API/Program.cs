@@ -171,8 +171,8 @@ static void SeedDatabase(IServiceProvider serviceProvider)
             context.SupplyCategories.Add(category);
             context.SaveChanges();
         }
-        context.Supplies.Add(new Supply { Name = "Certified Rice Seeds", UnitOfMeasure = "kg", UnitCost = 45.00m, StockQuantity = 1000, SupplyCategoryId = category.SupplyCategoryId, IsActive = true });
-        context.Supplies.Add(new Supply { Name = "Urea Fertilizer", UnitOfMeasure = "bag", UnitCost = 1200.00m, StockQuantity = 500, SupplyCategoryId = category.SupplyCategoryId, IsActive = true });
+        context.Supplies.Add(new Supply { Name = "Certified Rice Seeds", UnitOfMeasure = "kg", StockQuantity = 1000, SupplyCategoryId = category.SupplyCategoryId, IsActive = true });
+        context.Supplies.Add(new Supply { Name = "Urea Fertilizer", UnitOfMeasure = "bag", StockQuantity = 500, SupplyCategoryId = category.SupplyCategoryId, IsActive = true });
         context.SaveChanges();
     }
 

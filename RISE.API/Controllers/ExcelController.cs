@@ -23,7 +23,7 @@ public sealed class ExcelController : ControllerBase
     private static readonly string[] SupplyHeaders =
     {
         "Supply Name", "Category Name", "Unit of Measure",
-        "Unit Cost", "Stock Quantity", "Expiration Date"
+        "Stock Quantity", "Expiration Date"
     };
 
     private int OwnerId => OwnerScope.UserId(User);
@@ -293,7 +293,7 @@ public sealed class ExcelController : ControllerBase
                 new object?[] { "Supply Name", "Required, 2 to 200 characters." },
                 new object?[] { "Category Name", "Required; an existing category is reused, a new one is created when needed." },
                 new object?[] { "Unit of Measure", "Required, for example bag, sack, kg or pc." },
-                new object?[] { "Unit Cost / Stock Quantity", "Numbers only, zero or greater. Stock is initial inventory, not an adjustment." },
+                new object?[] { "Stock Quantity", "Number only, zero or greater. Stock is initial inventory, not an adjustment." },
                 new object?[] { "Duplicate check", "Active supplies with the same name, category and unit are skipped; existing records are never overwritten." }
             }
         };
@@ -308,7 +308,7 @@ public sealed class ExcelController : ControllerBase
             query = query.Where(supply => supply.Name.Contains(search) || supply.Category.Name.Contains(search));
         var supplies = await query.Select(supply => new
         {
-            supply.SupplyId, supply.Name, CategoryName = supply.Category.Name, supply.UnitOfMeasure, supply.UnitCost,
+            supply.SupplyId, supply.Name, CategoryName = supply.Category.Name, supply.UnitOfMeasure,
             supply.StockQuantity, supply.ExpirationDate, supply.CreatedAtUtc, supply.IsActive
         }).ToListAsync(cancellationToken);
         supplies = (sort switch
@@ -324,7 +324,6 @@ public sealed class ExcelController : ControllerBase
             new XlsxService.Column { Header = "Supply Name", Width = 28 },
             new XlsxService.Column { Header = "Category", Width = 20 },
             new XlsxService.Column { Header = "Unit of Measure", Width = 18 },
-            new XlsxService.Column { Header = "Unit Cost", Kind = XlsxService.CellKind.Number, Width = 14 },
             new XlsxService.Column { Header = "Stock Quantity", Kind = XlsxService.CellKind.Number, Width = 18 },
             new XlsxService.Column { Header = "Stock Status", Width = 16 },
             new XlsxService.Column { Header = "Expiration Date", Kind = XlsxService.CellKind.Date, Width = 18 },
@@ -334,7 +333,7 @@ public sealed class ExcelController : ControllerBase
         var rows = supplies.Select((supply, index) => new object?[]
         {
             index + 1, supply.Name, supply.CategoryName, supply.UnitOfMeasure,
-            supply.UnitCost, supply.StockQuantity, StockStatus(supply.StockQuantity),
+            supply.StockQuantity, StockStatus(supply.StockQuantity),
             supply.ExpirationDate, supply.CreatedAtUtc, supply.IsActive ? "Active" : "Archived"
         }).ToArray();
 
@@ -376,14 +375,12 @@ public sealed class ExcelController : ControllerBase
             var name = Clean(Get(row, "Supply Name", "Name"));
             var category = Clean(Get(row, "Category Name", "Category"));
             var unit = Clean(Get(row, "Unit of Measure", "Unit"));
-            var unitCostText = Get(row, "Unit Cost");
             var stockText = Get(row, "Stock Quantity");
             var expirationText = Get(row, "Expiration Date");
 
             if (name.Length < 2 || name.Length > 200) errors.Add("Supply Name must be 2 to 200 characters.");
             if (category.Length == 0 || category.Length > 100) errors.Add("Category Name is required (maximum 100 characters).");
             if (unit.Length == 0 || unit.Length > 30) errors.Add("Unit of Measure is required (maximum 30 characters).");
-            if (!TryDecimal(unitCostText, out var unitCost) || unitCost < 0) errors.Add("Unit Cost must be zero or greater.");
             if (!TryDecimal(stockText, out var stock) || stock < 0) errors.Add("Stock Quantity must be zero or greater.");
             DateOnly? expiration = null;
             var parsedExpiration = default(DateOnly);
@@ -444,7 +441,6 @@ public sealed class ExcelController : ControllerBase
             if (name.Length < 2 || name.Length > 200) rowErrors.Add("Invalid Supply Name.");
             if (categoryName.Length == 0 || categoryName.Length > 100) rowErrors.Add("Invalid Category Name.");
             if (unit.Length == 0 || unit.Length > 30) rowErrors.Add("Invalid Unit of Measure.");
-            if (!TryDecimal(Get(row, "Unit Cost"), out var unitCost) || unitCost < 0) rowErrors.Add("Invalid Unit Cost.");
             if (!TryDecimal(Get(row, "Stock Quantity"), out var stock) || stock < 0) rowErrors.Add("Invalid Stock Quantity.");
             DateOnly? expiration = null;
             var parsedExpiration = default(DateOnly);
@@ -472,7 +468,6 @@ public sealed class ExcelController : ControllerBase
             {
                 Name = name,
                 UnitOfMeasure = unit,
-                UnitCost = unitCost,
                 StockQuantity = stock,
                 ExpirationDate = expiration.HasValue ? expiration.Value.ToDateTime(TimeOnly.MinValue) : null,
                 Category = category,

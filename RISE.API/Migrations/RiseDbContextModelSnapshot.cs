@@ -16,7 +16,7 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261127124839_AddAccountOwnership";
+    public override string LastMigrationId => "20261127133225_RemoveSupplyUnitCost";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -443,10 +443,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                 b.Property<int>("SupplyCategoryId")
                     .HasColumnType("int");
 
-                b.Property<decimal>("UnitCost")
-                    .HasPrecision(18, 2)
-                    .HasColumnType("decimal(18,2)");
-
                 b.Property<string>("UnitOfMeasure")
                     .IsRequired()
                     .HasMaxLength(30)
@@ -461,8 +457,6 @@ partial class RiseDbContextModelSnapshot : ModelSnapshot
                 b.ToTable("Supplies", t =>
                     {
                         t.HasCheckConstraint("CK_Supplies_StockQuantity_NonNegative", "[StockQuantity] >= 0");
-
-                        t.HasCheckConstraint("CK_Supplies_UnitCost_NonNegative", "[UnitCost] >= 0");
                     });
             });
 

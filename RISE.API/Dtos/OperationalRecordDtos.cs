@@ -14,7 +14,6 @@ public sealed record SupplyDto(
     string UnitOfMeasure,
     decimal StockQuantity,
     bool IsActive,
-    decimal UnitCost,
     DateTime? ExpirationDate);
 
 public sealed class SupplyWriteDto
@@ -29,9 +28,6 @@ public sealed class SupplyWriteDto
 
     [Required, StringLength(30)]
     public string UnitOfMeasure { get; set; } = string.Empty;
-
-    [Range(typeof(decimal), "0", "9999999999999999.99")]
-    public decimal UnitCost { get; set; }
 
     [Range(typeof(decimal), "0", "999999999999999.999")]
     public decimal? StockQuantity { get; set; }
